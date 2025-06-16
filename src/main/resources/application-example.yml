@@ -53,5 +53,12 @@ jwt:
   # 记住登录过期时间（小时）
   expiration-remember: 168
 
+# 验证码配置
+verification:
+  # 验证码有效期（分钟）
+  code-expire-minutes: 5
+  # 验证码发送冷却时间（秒）
+  send-cooldown-seconds: 60
+
 server:
   port: 8080 
