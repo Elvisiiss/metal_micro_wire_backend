@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: metal_micro_wire_backend
+
+  # 数据库配置
+  datasource:
+    url: jdbc:mysql://localhost:3306/metal_micro_wire_new?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8
+    username: username
+    password: password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    # 是否显示SQL语句
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  # 邮件配置
+  mail:
+    host: smtp.qq.com
+    port: 465
+    username: username
+    password: password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          ssl:
+            enable: true
+  
+  # Redis配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      # password: 如有密码请取消注释
+      database: 2
+      timeout: 10000
+
+# JWT Token配置
+jwt:
+  # 请修改为随机字符串(jwt密钥)
+  secret: metal_micro_wire_secret_key_2024_very_secure_random_key_for_jwt_signing
+  # 普通登录过期时间（小时）
+  expiration-normal: 2
+  # 记住登录过期时间（小时）
+  expiration-remember: 168
+
+server:
+  port: 8080 
