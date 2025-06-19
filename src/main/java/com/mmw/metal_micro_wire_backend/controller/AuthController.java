@@ -126,4 +126,14 @@ public class AuthController {
         // 从header直接获取token
         return request.getHeader("token");
     }
+    
+    /**
+     * Root用户登录
+     */
+    @PostMapping("/root/login")
+    public ResponseEntity<AuthResponse> rootLogin(@Valid @RequestBody RootLoginRequest request) {
+        log.info("Root用户登录请求，用户名：{}", request.getUserName());
+        AuthResponse response = authService.rootLogin(request);
+        return ResponseEntity.ok(response);
+    }
 } 

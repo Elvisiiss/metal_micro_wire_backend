@@ -51,14 +51,16 @@ public class AuthInterceptor implements HandlerInterceptor {
         String email = tokenService.getEmailFromToken(token);
         String userName = tokenService.getUserNameFromToken(token);
         Integer roleId = tokenService.getRoleIdFromToken(token);
+        TokenService.UserType userType = tokenService.getUserTypeFromToken(token);
         
         request.setAttribute("userId", userId);
         request.setAttribute("email", email);
         request.setAttribute("userName", userName);
         request.setAttribute("roleId", roleId);
+        request.setAttribute("userType", userType);
         request.setAttribute("token", token);
         
-        log.debug("Token验证成功，用户ID：{}，邮箱：{}，URI：{}", userId, email, request.getRequestURI());
+        log.debug("Token验证成功，用户ID：{}，邮箱：{}，用户类型：{}，URI：{}", userId, email, userType, request.getRequestURI());
         return true;
     }
     

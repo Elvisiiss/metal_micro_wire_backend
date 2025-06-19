@@ -22,12 +22,12 @@ public class TokenServiceImpl implements TokenService {
     private final RedisService redisService;
     private final JwtConfig jwtConfig;
     
-    private static final String USER_TOKEN_PREFIX = "user_token:";
+    private static final String TOKEN_PREFIX = "token:";
     
     @Override
-    public String generateAndSaveToken(Long userId, String email, String userName, Integer roleId, Boolean remember) {
+    public String generateAndSaveToken(Long userId, String email, String userName, Integer roleId, Boolean remember, UserType userType) {
         // 生成JWT Token
-        String token = jwtUtil.generateToken(userId, email, userName, roleId, remember);
+        String token = jwtUtil.generateToken(userId, email, userName, roleId, remember, userType);
         
         // 计算过期时间（小时转换为秒）
         int expirationHours = (remember != null && remember) ? 
@@ -35,13 +35,14 @@ public class TokenServiceImpl implements TokenService {
         long expirationSeconds = expirationHours * 60L * 60L;
         
         // 删除用户之前的Token（如果存在）
-        deleteUserToken(userId);
+        deleteUserToken(userId, userType);
         
-        // 将Token保存到Redis，key为user_token:用户ID，value为Token
-        String redisKey = USER_TOKEN_PREFIX + userId;
+        // 将Token保存到Redis，key为token:用户类型:用户ID，value为Token
+        String redisKey = TOKEN_PREFIX + userType.getPrefix() + ":" + userId;
         redisService.setWithExpiration(redisKey, token, expirationSeconds, TimeUnit.SECONDS);
         
-        log.info("Token已生成并保存到Redis，用户ID：{}，过期时间：{}小时，旧Token已失效", userId, expirationHours);
+        log.info("Token已生成并保存到Redis，用户类型：{}，用户ID：{}，过期时间：{}小时，旧Token已失效", 
+                userType.name(), userId, expirationHours);
         return token;
     }
     
@@ -99,11 +100,19 @@ public class TokenServiceImpl implements TokenService {
     }
     
     @Override
-    public void deleteUserToken(Long userId) {
-        if (userId != null) {
-            String redisKey = USER_TOKEN_PREFIX + userId;
+    public UserType getUserTypeFromToken(String token) {
+        if (!validateToken(token)) {
+            return null;
+        }
+        return jwtUtil.getUserTypeFromToken(token);
+    }
+    
+    @Override
+    public void deleteUserToken(Long userId, UserType userType) {
+        if (userId != null && userType != null) {
+            String redisKey = TOKEN_PREFIX + userType.getPrefix() + ":" + userId;
             redisService.delete(redisKey);
-            log.info("用户Token已从Redis中删除，用户ID：{}", userId);
+            log.info("用户Token已从Redis中删除，用户类型：{}，用户ID：{}", userType.name(), userId);
         }
     }
     
@@ -111,8 +120,9 @@ public class TokenServiceImpl implements TokenService {
     public void deleteTokenByToken(String token) {
         if (token != null && !token.trim().isEmpty()) {
             Long userId = jwtUtil.getUserIdFromToken(token);
-            if (userId != null) {
-                deleteUserToken(userId);
+            UserType userType = jwtUtil.getUserTypeFromToken(token);
+            if (userId != null && userType != null) {
+                deleteUserToken(userId, userType);
             }
         }
     }
@@ -123,25 +133,26 @@ public class TokenServiceImpl implements TokenService {
             return false;
         }
         
-        // 从Token中获取用户ID
+        // 从Token中获取用户ID和用户类型
         Long userId = jwtUtil.getUserIdFromToken(token);
-        if (userId == null) {
+        UserType userType = jwtUtil.getUserTypeFromToken(token);
+        if (userId == null || userType == null) {
             return false;
         }
         
         // 检查Redis中存储的Token是否与当前Token一致
-        String redisKey = USER_TOKEN_PREFIX + userId;
+        String redisKey = TOKEN_PREFIX + userType.getPrefix() + ":" + userId;
         String storedToken = redisService.get(redisKey);
         
         if (storedToken == null) {
-            log.debug("用户Token在Redis中不存在，用户ID：{}", userId);
+            log.debug("用户Token在Redis中不存在，用户类型：{}，用户ID：{}", userType.name(), userId);
             return false;
         }
         
         // 验证存储的Token值是否与当前Token一致
         boolean isValid = storedToken.equals(token);
         if (!isValid) {
-            log.warn("Token不匹配，用户ID：{}，可能是旧Token或被替换", userId);
+            log.warn("Token不匹配，用户类型：{}，用户ID：{}，可能是旧Token或被替换", userType.name(), userId);
         }
         
         return isValid;

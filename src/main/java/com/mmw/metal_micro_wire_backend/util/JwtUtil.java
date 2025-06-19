@@ -1,6 +1,7 @@
 package com.mmw.metal_micro_wire_backend.util;
 
 import com.mmw.metal_micro_wire_backend.config.JwtConfig;
+import com.mmw.metal_micro_wire_backend.service.TokenService;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
@@ -30,14 +31,16 @@ public class JwtUtil {
      * @param userName 用户名
      * @param roleId 角色ID
      * @param remember 是否记住登录
+     * @param userType 用户类型
      * @return JWT Token
      */
-    public String generateToken(Long userId, String email, String userName, Integer roleId, Boolean remember) {
+    public String generateToken(Long userId, String email, String userName, Integer roleId, Boolean remember, TokenService.UserType userType) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("email", email);
         claims.put("userName", userName);
         claims.put("roleId", roleId);
+        claims.put("userType", userType.name()); // 存储用户类型
         
         // 根据是否记住登录设置不同的过期时间
         int expirationHours = (remember != null && remember) ? 
@@ -138,6 +141,26 @@ public class JwtUtil {
         Claims claims = getClaimsFromToken(token);
         if (claims != null) {
             return claims.get("roleId", Integer.class);
+        }
+        return null;
+    }
+    
+    /**
+     * 从Token中获取用户类型
+     * @param token JWT Token
+     * @return 用户类型
+     */
+    public TokenService.UserType getUserTypeFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        if (claims != null) {
+            String userTypeStr = claims.get("userType", String.class);
+            if (userTypeStr != null) {
+                try {
+                    return TokenService.UserType.valueOf(userTypeStr);
+                } catch (IllegalArgumentException e) {
+                    log.warn("无效的用户类型: {}", userTypeStr);
+                }
+            }
         }
         return null;
     }

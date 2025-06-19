@@ -3,7 +3,9 @@ package com.mmw.metal_micro_wire_backend.service.impl;
 import com.mmw.metal_micro_wire_backend.dto.BaseResponse;
 import com.mmw.metal_micro_wire_backend.dto.auth.*;
 import com.mmw.metal_micro_wire_backend.entity.User;
+import com.mmw.metal_micro_wire_backend.entity.Root;
 import com.mmw.metal_micro_wire_backend.repository.UserRepository;
+import com.mmw.metal_micro_wire_backend.repository.RootRepository;
 import com.mmw.metal_micro_wire_backend.service.AuthService;
 import com.mmw.metal_micro_wire_backend.service.EmailService;
 import com.mmw.metal_micro_wire_backend.service.RedisService;
@@ -24,6 +26,7 @@ import java.util.Optional;
 public class AuthServiceImpl implements AuthService {
     
     private final UserRepository userRepository;
+    private final RootRepository rootRepository;
     private final EmailService emailService;
     private final RedisService redisService;
     private final BCryptPasswordEncoder passwordEncoder;
@@ -193,6 +196,12 @@ public class AuthServiceImpl implements AuthService {
             
             User user = userOpt.get();
             
+            // 检查用户状态
+            if (user.getStatus() == 1) {
+                log.warn("用户登录失败，账户已被禁用，用户名：{}", user.getUserName());
+                return AuthResponse.error("账户已被禁用，请联系管理员");
+            }
+            
             // 验证密码
             if (!passwordEncoder.matches(password, user.getPassword())) {
                 return AuthResponse.error("账户或密码错误");
@@ -200,7 +209,7 @@ public class AuthServiceImpl implements AuthService {
             
             // 生成并保存token到Redis
             String token = tokenService.generateAndSaveToken(
-                user.getId(), user.getEmail(), user.getUserName(), user.getRoleId(), remember);
+                user.getId(), user.getEmail(), user.getUserName(), user.getRoleId(), remember, TokenService.UserType.NORMAL);
             
             log.info("用户登录成功，邮箱：{}，用户名：{}", user.getEmail(), user.getUserName());
             return AuthResponse.success("成功登录", user.getEmail(), user.getUserName(), user.getRoleId(), token);
@@ -216,8 +225,15 @@ public class AuthServiceImpl implements AuthService {
         String email = request.getE_mail();
         
         // 检查邮箱是否存在
-        if (!userRepository.existsByEmail(email)) {
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
             return SendCodeResponse.error("邮箱不存在", email);
+        }
+        
+        // 检查用户状态
+        User user = userOpt.get();
+        if (user.getStatus() == 1) {
+            return SendCodeResponse.error("账户已被禁用，请联系管理员", email);
         }
         
         // 检查是否已发送验证码（防止频繁发送）  
@@ -262,9 +278,15 @@ public class AuthServiceImpl implements AuthService {
             
             User user = userOpt.get();
             
+            // 检查用户状态
+            if (user.getStatus() == 1) {
+                log.warn("用户验证码登录失败，账户已被禁用，用户名：{}", user.getUserName());
+                return AuthResponse.error("账户已被禁用，请联系管理员");
+            }
+            
             // 验证码登录默认不记住登录状态
             String token = tokenService.generateAndSaveToken(
-                user.getId(), user.getEmail(), user.getUserName(), user.getRoleId(), false);
+                user.getId(), user.getEmail(), user.getUserName(), user.getRoleId(), false, TokenService.UserType.NORMAL);
             
             log.info("用户验证码登录成功，邮箱：{}，用户名：{}", user.getEmail(), user.getUserName());
             return AuthResponse.success("成功登录", user.getEmail(), user.getUserName(), user.getRoleId(), token);
@@ -291,6 +313,42 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             log.error("用户登出失败，错误：{}", e.getMessage());
             return BaseResponse.error("登出失败");
+        }
+    }
+    
+    @Override
+    public AuthResponse rootLogin(RootLoginRequest request) {
+        String userName = request.getUserName();
+        String password = request.getPassword();
+        Boolean remember = request.getRemember();
+        
+        try {
+            // 根据用户名查找Root用户
+            Optional<Root> rootOpt = rootRepository.findByUserName(userName);
+            
+            if (rootOpt.isEmpty()) {
+                log.warn("Root登录失败，用户名不存在：{}", userName);
+                return AuthResponse.error("Root用户名或密码错误");
+            }
+            
+            Root root = rootOpt.get();
+            
+            // 验证密码
+            if (!passwordEncoder.matches(password, root.getPassword())) {
+                log.warn("Root登录失败，密码错误，用户名：{}", userName);
+                return AuthResponse.error("Root用户名或密码错误");
+            }
+            
+            // 生成并保存token到Redis (Root用户角色ID设为999，表示超级管理员)
+            String token = tokenService.generateAndSaveToken(
+                root.getId(), "root@system", root.getUserName(), 999, remember, TokenService.UserType.ROOT);
+            
+            log.info("Root用户登录成功，用户名：{}", root.getUserName());
+            return AuthResponse.success("Root登录成功", "root@system", root.getUserName(), 999, token);
+            
+        } catch (Exception e) {
+            log.error("Root登录失败，用户名：{}，错误：{}", userName, e.getMessage());
+            return AuthResponse.error("Root登录失败");
         }
     }
 } 

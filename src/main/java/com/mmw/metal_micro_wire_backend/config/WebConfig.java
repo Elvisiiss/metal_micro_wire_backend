@@ -1,6 +1,7 @@
 package com.mmw.metal_micro_wire_backend.config;
 
 import com.mmw.metal_micro_wire_backend.interceptor.AuthInterceptor;
+import com.mmw.metal_micro_wire_backend.interceptor.RootAuthInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -15,9 +16,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
     
     private final AuthInterceptor authInterceptor;
+    private final RootAuthInterceptor rootAuthInterceptor;
     
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // 1. 基础认证拦截器 - 验证Token有效性
         registry.addInterceptor(authInterceptor)
                 // 需要认证的路径
                 .addPathPatterns("/api/**")
@@ -27,6 +30,7 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/auth/register/**",
                         "/api/auth/login/**", 
                         "/api/auth/reset-password/**",
+                        "/api/auth/root/**",
                         // 注意：/api/auth/user/data 和 /api/auth/logout 需要认证，所以不排除
                         
                         // 静态资源
@@ -41,7 +45,13 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/health",
                         // 错误页面
                         "/error"
-                );
+                )
+                .order(0); // 基础认证拦截器优先级最高
+        
+        // 2. Root权限拦截器 - 验证Root用户权限（在基础认证之后执行）
+        registry.addInterceptor(rootAuthInterceptor)
+                .addPathPatterns("/api/root/**")
+                .order(1); // 确保在AuthInterceptor之后执行
     }
 }
  

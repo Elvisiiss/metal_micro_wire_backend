@@ -44,6 +44,11 @@ public interface AuthService {
     AuthResponse loginWithCode(VerifyCodeRequest request);
     
     /**
+     * Root用户登录
+     */
+    AuthResponse rootLogin(RootLoginRequest request);
+    
+    /**
      * 用户登出
      * @param token 用户的token
      * @return 登出结果

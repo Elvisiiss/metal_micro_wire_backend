@@ -1,21 +1,110 @@
 # Metal Micro Wire Backend
 
-金属微丝后端项目
+金属微丝后端项目 - 基于Spring Boot的企业级用户管理系统
 
 ## 功能特性
 
-- 用户注册/登录（邮箱验证码、用户名密码）
-- **基于Redis的Token认证系统**
-- 密码重置
-- 邮件验证码发送
-- JWT Token管理
-- 接口权限控制
+### 核心功能
+- 🔐 **双重用户系统**：支持普通用户和Root超级管理员
+- 👤 **完整用户管理**：注册、登录、权限控制、状态管理
+- 🛡️ **Token安全机制**：JWT + Redis双重验证，解决ID冲突问题
+- 📧 **邮件验证系统**：支持注册、登录、密码重置验证码
+- 🔒 **密码安全**：BCrypt加密存储
+- 🎯 **角色权限控制**：多级权限管理（普通用户/管理员/Root）
+
+### Root管理功能
+- ✅ **用户提权降权**：设置用户角色（普通用户/管理员）
+- 🚫 **用户禁用启用**：控制用户登录状态
+- 📊 **用户列表管理**：分页查询、关键词搜索
+- 🔄 **批量操作**：支持批量禁用、启用、提权、降权
+- 📋 **用户详情查看**：完整的用户信息展示
+
+## 系统架构
+
+### 用户类型
+| 类型 | 角色ID | 权限说明 |
+|------|-------|----------|
+| **普通用户** | 0 | 基本权限，注册登录等 |
+| **管理员** | 1 | 管理权限，扩展功能 |
+| **Root用户** | 999 | 超级管理员，用户管理 |
+
+### 用户状态
+| 状态 | 值 | 说明 |
+|------|---|------|
+| **正常** | 0 | 可以正常登录使用 |
+| **禁用** | 1 | 无法登录，被管理员禁用 |
+
+## Token冲突解决方案
+
+### 问题背景
+原始设计中Root用户和普通用户都使用自增ID，可能导致Redis中Token键冲突：
+- Root用户ID=1 和 普通用户ID=1 都使用`user_token:1`，造成Token覆盖
+
+### 解决方案
+引入**用户类型枚举**，修改Redis键命名规则：
+
+```java
+// 用户类型枚举
+enum UserType {
+    NORMAL("user"),  // 普通用户
+    ROOT("root");    // Root用户
+}
+
+// Redis键格式
+token:user:1    // 普通用户ID=1
+token:root:1    // Root用户ID=1
+```
+
+### JWT Token增强
+Token中包含用户类型信息：
+```json
+{
+  "userId": 1,
+  "email": "user@example.com", 
+  "userName": "testuser",
+  "roleId": 0,
+  "userType": "NORMAL",
+  "iat": 1640995200,
+  "exp": 1641081600
+}
+```
+
+### 安全保障
+- ✅ **完全隔离**：Root和普通用户Token互不影响
+- ✅ **类型验证**：Token中包含用户类型，支持双重验证
+- ✅ **权限控制**：Root接口只允许Root用户访问，普通用户访问会被拦截
+- ✅ **双重拦截器**：基础认证拦截器 + Root权限拦截器
+- ✅ **日志追踪**：详细记录不同类型用户的操作和权限验证
+
+## API接口
+
+### Root管理接口
+
+| 方法 | 端点 | 描述 |
+|------|------|------|
+| POST | `/api/auth/root/login` | Root用户登录 |
+| GET | `/api/root/users` | 获取用户列表（分页）|
+| PUT | `/api/root/users/role` | 用户提权/降权 |
+| PUT | `/api/root/users/status` | 用户禁用/启用 |
+| GET | `/api/root/users/{userId}` | 获取用户详情 |
+| PUT | `/api/root/users/batch` | 批量用户操作 |
+
+### 普通用户接口
+
+| 方法 | 端点 | 描述 |
+|------|------|------|
+| POST | `/api/auth/register/send-code` | 发送注册验证码 |
+| POST | `/api/auth/register/verify-code` | 用户注册 |
+| POST | `/api/auth/login/password` | 密码登录 |
+| POST | `/api/auth/login/send-code` | 发送登录验证码 |
+| POST | `/api/auth/login/verify-code` | 验证码登录 |
+| POST | `/api/auth/reset-password/send-code` | 发送重置密码验证码 |
+| POST | `/api/auth/reset-password/verify-code` | 重置密码 |
+| GET | `/api/auth/logout` | 用户登出 |
 
 ## Token认证系统
 
 ### 配置说明
-
-在 `application.yml` 中配置JWT相关参数：
 
 ```yaml
 # JWT Token配置
@@ -33,12 +122,6 @@ verification:
   # 验证码发送冷却时间（秒）
   send-cooldown-seconds: 60
 ```
-
-### Token生成和存储
-
-1. **登录时生成Token**：用户成功登录后，系统会生成JWT Token
-2. **存储到Redis**：Token同时存储在Redis中，设置过期时间
-3. **返回给客户端**：Token在登录响应中返回给前端
 
 ### Token使用方式
 
@@ -59,156 +142,165 @@ verification:
    token: your_jwt_token
    ```
 
-### 认证流程
-
-1. **登录获取Token**：
-   ```http
-   POST /api/auth/login/password
-   {
-     "msg": "登录请求",
-     "status": 1,
-     "account": "user@example.com",
-     "passwd": "password123",
-     "remember": true
-   }
-   ```
-
-2. **访问需要认证的接口**：
-   ```http
-   GET /api/user/profile
-   Authorization: Bearer your_jwt_token
-   ```
-
-3. **登出删除Token**：
-   ```http
-   POST /api/auth/logout
-   Authorization: Bearer your_jwt_token
-   ```
-
-### 接口权限控制
-
-- **无需认证的路径**：
-  - `/api/auth/register/**` - 用户注册相关接口
-  - `/api/auth/login/**` - 用户登录相关接口
-  - `/api/auth/reset/**` - 密码重置相关接口
-  - 静态资源、Swagger文档等
-
-- **需要认证的路径**：
-  - `/api/auth/user/data` - 获取用户数据（需要Token）
-  - `/api/auth/logout` - 用户登出（需要Token）
-  - `/api/user/**` - 所有用户相关接口
-
-### Token验证机制
+### 验证机制
 
 系统采用多重验证机制：
 
 1. **JWT Token验证**：验证Token格式、签名、过期时间
-2. **用户Token唯一性验证**：以用户ID为key存储Token，确保用户只有一个有效Token
-3. **Token值完整性验证**：验证当前Token是否与Redis中存储的Token完全一致
+2. **用户类型验证**：验证用户类型和权限
+3. **Token唯一性验证**：确保用户只有一个有效Token
+4. **状态检查**：验证用户是否被禁用
+5. **Root权限拦截**：`/api/root/**`接口只允许Root用户访问
 
 **重要特性**：
+- 被禁用用户无法登录（包括密码登录和验证码登录）
 - 用户重新登录后，之前的Token会自动失效
-- 每个用户同时只能有一个有效的Token
-- Token被替换后，旧Token立即无法使用
+- Root用户和普通用户Token完全隔离
+- **权限严格控制**：普通用户无法访问Root管理接口，返回403 Forbidden
 
-### 错误处理
+5. **权限验证测试**
+   ```http
+   # 普通用户尝试访问Root接口（应该返回403）
+   GET {{BASE_URL}}/api/root/users
+   Authorization: Bearer {{USER_TOKEN}}
+   
+   # 期望返回：
+   # {
+   #   "code": "Error",
+   #   "msg": "权限不足，仅Root用户可访问此接口"
+   # }
+   ```
 
-当Token验证失败时，系统返回：
+### Redis监控
 
-```json
-{
-  "code": "Error",
-  "msg": "token无效或已过期"
-}
+测试过程中可使用以下命令监控Token存储：
+
+```bash
+# 查看所有Token键
+redis-cli keys "token:*"
+
+# 查看Root用户Token
+redis-cli keys "token:root:*"
+
+# 查看普通用户Token  
+redis-cli keys "token:user:*"
 ```
 
-HTTP状态码：401 Unauthorized
+## 数据库表结构
 
-### 登录状态管理
+### users表（普通用户）
+```sql
+CREATE TABLE users (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_name VARCHAR(255) UNIQUE NOT NULL COMMENT '用户名',
+    email VARCHAR(255) UNIQUE NOT NULL COMMENT '邮箱',
+    password VARCHAR(255) NOT NULL COMMENT '密码(BCrypt加密)',
+    role_id INT NOT NULL DEFAULT 0 COMMENT '角色ID (0: 普通用户, 1: 管理员)',
+    status INT NOT NULL DEFAULT 0 COMMENT '用户状态 (0: 正常, 1: 禁用)',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+);
+```
 
-- **普通登录**：Token过期时间为2小时（默认配置）
-- **记住登录**：Token过期时间为168小时（7天，默认配置）
-- **主动登出**：调用登出接口删除Redis中的Token
-
-## API接口
-
-### 认证相关接口
-
-- `POST /api/auth/register/send-code` - 发送注册验证码
-- `POST /api/auth/register/verify-code` - 用户注册
-- `POST /api/auth/login/password` - 密码登录（返回Token）
-- `POST /api/auth/login/send-code` - 发送登录验证码
-- `POST /api/auth/login/verify-code` - 验证码登录（返回Token）
-- `POST /api/auth/reset/send-code` - 发送重置密码验证码
-- `POST /api/auth/reset/verify-code` - 重置密码
-- `POST /api/auth/logout` - 用户登出（需要Token）
-
-### 用户相关接口（需要Token认证）
-
-- `GET /api/user/profile` - 获取当前用户信息
-- `POST /api/user/update` - 更新用户信息
+### user_root表（Root用户）
+```sql
+CREATE TABLE user_root (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_name VARCHAR(255) UNIQUE NOT NULL COMMENT '用户名',
+    password VARCHAR(255) NOT NULL COMMENT '密码(BCrypt加密)'
+);
+```
 
 ## 技术栈
 
-- Spring Boot 3.4.5
-- Spring Data JPA
-- MySQL
-- Redis
-- JWT (JJWT)
-- BCrypt
-- Java Mail
-- Lombok
+- **框架**: Spring Boot 3.4.5
+- **数据访问**: Spring Data JPA
+- **数据库**: MySQL 8.0+
+- **缓存**: Redis 6.0+
+- **安全**: JWT (JJWT) + BCrypt
+- **邮件**: Java Mail
+- **工具**: Lombok
+- **文档**: Swagger/OpenAPI
 
-## 系统优化特性
+## 快速开始
 
-### 验证码机制优化
-- **可配置冷却时间**：默认60秒发送冷却，可在配置文件调整
-- **可配置有效期**：默认5分钟有效期，可在配置文件调整
-- **智能提示**：显示剩余冷却时间
-- **网络容错**：验证码过期后可重新发送
-
-### Token安全机制
-- **单点登录**：用户重新登录后旧Token自动失效
-- **Token唯一性**：每个用户同时只能有一个有效Token
-- **完整性验证**：确保Token值完全匹配
-
-## 环境要求
+### 环境要求
 
 - Java 17+
 - MySQL 8.0+
 - Redis 6.0+
-
-## 快速开始
+- Maven 3.6+
 
 ### 运行步骤
 
-1. **配置数据库和Redis**
+1. **克隆项目**
+   ```bash
+   git clone <repository-url>
+   cd metal_micro_wire_backend
+   ```
+
+2. **配置数据库和Redis**
    - 确保MySQL和Redis服务正在运行
-   - 根据实际情况修改application.yml中的配置
+   - 复制 `application-example.yml` 为 `application.yml`
+   - 根据实际情况修改数据库和Redis配置
 
-2. **编译项目**
-```bash
-mvn clean compile
-```
+3. **编译项目**
+   ```bash
+   mvn clean compile
+   ```
 
-3. **运行项目**
-```bash
-mvn spring-boot:run
-```
+4. **运行项目**
+   ```bash
+   mvn spring-boot:run
+   ```
 
-4. **验证服务**
+5. **验证服务**
    - 访问 http://localhost:8080/api/health 检查服务状态
 
-## API接口
+### 初始化Root用户
 
-详细的API文档请查看 `src/main/resources/docs/AUTH_API.md`
+首次运行需要创建Root用户（建议通过数据库直接插入）
 
-主要接口：
-- `/api/auth/register/send-code` - 发送注册验证码
-- `/api/auth/register/verify-code` - 用户注册
-- `/api/auth/login/password` - 账号密码登录
-- `/api/auth/login/send-code` - 发送登录验证码
-- `/api/auth/login/verify-code` - 验证码登录
-- `/api/auth/reset-password/send-code` - 发送重置密码验证码
-- `/api/auth/reset-password/verify-code` - 重置密码
-- `/api/health` - 健康检查 
+
+## 部署注意事项
+
+### 生产环境配置
+
+1. **安全配置**
+   - 修改JWT密钥
+   - 配置强密码策略
+   - 限制Root用户创建权限
+
+2. **Redis配置**
+   - 部署前清理旧Token格式：
+     ```bash
+     redis-cli --scan --pattern "user_token:*" | xargs redis-cli del
+     ```
+
+3. **监控配置**
+   - 关注Token类型日志
+   - 监控用户登录状态
+   - 定期审查用户权限
+
+## 系统特色
+
+### 🔒 安全特性
+- **Token冲突解决**：完美解决Root用户和普通用户ID冲突
+- **状态控制**：支持用户禁用，提高系统安全性
+- **权限隔离**：不同类型用户权限完全隔离
+- **日志追踪**：详细的操作日志记录
+
+### 🚀 性能优化
+- **Redis缓存**：Token存储优化，快速验证
+- **分页查询**：大数据量用户列表高效处理
+- **批量操作**：提高管理效率
+
+### 🛠️ 开发友好
+- **完整文档**：详细的API文档和测试用例
+- **清晰架构**：分层架构，易于扩展维护
+- **配置灵活**：支持多环境配置
+
+---
+
+> 💡 **提示**: 更多详细信息请查看 `src/main/resources/docs/` 目录下的API文档。
+
