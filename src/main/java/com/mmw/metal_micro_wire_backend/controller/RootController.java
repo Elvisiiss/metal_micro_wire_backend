@@ -40,15 +40,31 @@ public class RootController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "10") @Min(1) int size,
             @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "createTime") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
             HttpServletRequest request) {
         
         String rootUserName = (String) request.getAttribute("userName");
         Long rootUserId = (Long) request.getAttribute("userId");
-        log.info("Root用户获取用户列表，Root用户：{}(ID:{}), 页码：{}，大小：{}，关键词：{}", 
-                rootUserName, rootUserId, page, size, keyword);
+        log.info("Root用户获取用户列表，Root用户：{}(ID:{}), 页码：{}，大小：{}，关键词：{}，排序：{} {}", 
+                rootUserName, rootUserId, page, size, keyword, sortBy, sortDir);
         
         try {
-            Pageable pageable = PageRequest.of(page, size, Sort.by("createTime").descending());
+            // 验证排序字段
+            if (!sortBy.equals("id") && !sortBy.equals("createTime")) {
+                sortBy = "createTime";
+            }
+            
+            // 验证排序方向
+            if (!sortDir.equals("asc") && !sortDir.equals("desc")) {
+                sortDir = "desc";
+            }
+            
+            Sort sort = sortDir.equals("asc") ? 
+                Sort.by(sortBy).ascending() : 
+                Sort.by(sortBy).descending();
+            
+            Pageable pageable = PageRequest.of(page, size, sort);
             Page<User> userPage;
             
             if (keyword != null && !keyword.trim().isEmpty()) {

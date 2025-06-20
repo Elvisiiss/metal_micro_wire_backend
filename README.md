@@ -83,7 +83,7 @@ Token中包含用户类型信息：
 | 方法 | 端点 | 描述 |
 |------|------|------|
 | POST | `/api/auth/root/login` | Root用户登录 |
-| GET | `/api/root/users` | 获取用户列表（分页）|
+| GET | `/api/root/users` | 获取用户列表（分页、排序）|
 | PUT | `/api/root/users/role` | 用户提权/降权 |
 | PUT | `/api/root/users/status` | 用户禁用/启用 |
 | GET | `/api/root/users/{userId}` | 获取用户详情 |

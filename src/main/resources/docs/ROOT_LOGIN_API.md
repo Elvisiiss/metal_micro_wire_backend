@@ -51,6 +51,8 @@ Root登录功能为系统管理员提供了最高权限的访问能力。Root用
 - `page`: 页码（可选，默认0）
 - `size`: 每页大小（可选，默认10）
 - `keyword`: 搜索关键词（可选，支持用户名和邮箱模糊搜索）
+- `sortBy`: 排序字段（可选，默认createTime，支持：id、createTime）
+- `sortDir`: 排序方向（可选，默认desc，支持：asc、desc）
 
 #### 成功响应
 ```json
@@ -223,7 +225,16 @@ curl -X POST http://localhost:8080/api/auth/root/login \
 
 ### 获取用户列表
 ```bash
+# 按创建时间降序排列（默认）
 curl -X GET "http://localhost:8080/api/root/users?page=0&size=10&keyword=test" \
+  -H "Authorization: Bearer YOUR_ROOT_TOKEN"
+
+# 按ID升序排列
+curl -X GET "http://localhost:8080/api/root/users?page=0&size=10&sortBy=id&sortDir=asc" \
+  -H "Authorization: Bearer YOUR_ROOT_TOKEN"
+
+# 按创建时间升序排列
+curl -X GET "http://localhost:8080/api/root/users?page=0&size=10&sortBy=createTime&sortDir=asc" \
   -H "Authorization: Bearer YOUR_ROOT_TOKEN"
 ```
 
