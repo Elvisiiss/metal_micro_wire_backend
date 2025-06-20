@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import com.mmw.metal_micro_wire_backend.util.JwtUtil;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -23,6 +24,7 @@ import jakarta.validation.Valid;
 public class AuthController {
     
     private final AuthService authService;
+    private final JwtUtil jwtUtil;
     
     /**
      * 发送注册验证码
@@ -136,4 +138,12 @@ public class AuthController {
         AuthResponse response = authService.rootLogin(request);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/token")
+    public Integer returnToken(@RequestParam String token){
+        if(!jwtUtil.validateToken(token)){return -1;}
+        if(jwtUtil.isTokenExpired(token)){return -1;}
+        else return jwtUtil.getRoleIdFromToken(token);
+    }
+
 } 

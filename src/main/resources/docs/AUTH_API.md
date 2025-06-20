@@ -337,6 +337,18 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 }
 ```
 
+#### 5.3 获取用户角色id（token）
+- **接口**: `GET /api/auth/token`
+- **认证**: ❌ 无需认证
+- **请求头示例**:
+```http
+token: eyJhbGciOiJIUzI1NiJ9...
+```
+- **成功响应**:
+```
+1
+```
+
 ## 错误代码说明
 
 ### HTTP状态码
