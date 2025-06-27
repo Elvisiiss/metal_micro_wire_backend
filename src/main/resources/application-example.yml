@@ -60,5 +60,27 @@ verification:
   # 验证码发送冷却时间（秒）
   send-cooldown-seconds: 60
 
+# 华为云IoT配置
+huawei:
+  iot:
+    # AMQP连接配置
+    amqp:
+      host: 1ef972c084.st1.iotda-app.cn-north-4.myhuaweicloud.com
+      port: 5671
+      access-key: JOPvCH6V
+      access-code: Y94aIdqb3BND7fFm6RqZTDieXn7I2bWE
+      default-queue: DefaultQueue
+      # 连接配置
+      queue-prefetch: 100
+      auto-acknowledge: true
+      reconnect-delay: 3000
+      max-reconnect-delay: 30000
+    # 消息处理配置
+    message:
+      # 是否启用详细日志
+      enable-detailed-logging: true
+      # 最大消息大小（字符数）
+      max-message-size: 1000000
+
 server:
-  port: 8080 
+  port: 8080
