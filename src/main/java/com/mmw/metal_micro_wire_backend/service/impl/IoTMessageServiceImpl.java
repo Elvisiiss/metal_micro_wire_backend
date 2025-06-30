@@ -49,7 +49,7 @@ public class IoTMessageServiceImpl implements IoTMessageService {
             
             if (messageConfig.isEnableDetailedLogging()) {
                 log.info("收到IoT原始消息，大小: {} 字符", rawMessage.length());
-                log.debug("消息内容: {}", rawMessage);
+                log.info("消息内容: {}", rawMessage);
             }
             
             // 先尝试解析为JSON，验证消息格式是否正确

@@ -63,7 +63,14 @@ verification:
 # 华为云IoT配置
 huawei:
   iot:
-    # AMQP连接配置
+    # SDK配置 - 用于主动推送消息到设备
+    ak: HPUARWPPVCIQHLXUGBSA
+    sk: ae8wCDrJQkLUNaqSYwYEXA71tYMXSeYfo1dImQXf
+    endpoint: https://1ef972c084.st1.iotda-app.cn-north-4.myhuaweicloud.com
+    project-id: 768eb2550b2146a39048ba0330c487c9
+    region: cn-north-4
+    
+    # AMQP连接配置 - 用于接收设备消息
     amqp:
       host: 1ef972c084.st1.iotda-app.cn-north-4.myhuaweicloud.com
       port: 5671
@@ -81,6 +88,13 @@ huawei:
       enable-detailed-logging: true
       # 最大消息大小（字符数）
       max-message-size: 1000000
+
+# 示例配置
+example:
+  # 华为云IoT消息推送示例
+  huawei-iot:
+    # 是否启用华为云IoT消息推送示例（启动时自动运行）
+    enabled: false
 
 server:
   port: 8080

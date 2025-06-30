@@ -116,6 +116,18 @@
 			<artifactId>commons-lang3</artifactId>
 			<version>3.12.0</version>
 		</dependency>
+
+		<!-- 华为云IoT SDK -->
+		<dependency>
+			<groupId>com.huaweicloud.sdk</groupId>
+			<artifactId>huaweicloud-sdk-core</artifactId>
+			<version>3.1.114</version>
+		</dependency>
+		<dependency>
+			<groupId>com.huaweicloud.sdk</groupId>
+			<artifactId>huaweicloud-sdk-iotda</artifactId>
+			<version>3.1.114</version>
+		</dependency>
 	</dependencies>
 
 	<build>
