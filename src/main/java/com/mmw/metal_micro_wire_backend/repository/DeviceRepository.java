@@ -1,6 +1,8 @@
 package com.mmw.metal_micro_wire_backend.repository;
 
 import com.mmw.metal_micro_wire_backend.entity.Device;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -10,4 +12,19 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface DeviceRepository extends JpaRepository<Device, String> {
     
+    /**
+     * 根据状态分页查询设备
+     */
+    Page<Device> findByStatus(Device.DeviceStatus status, Pageable pageable);
+    
+    /**
+     * 查询所有设备（分页）
+     */
+    @Override
+    Page<Device> findAll(Pageable pageable);
+    
+    /**
+     * 检查设备ID是否存在
+     */
+    boolean existsByDeviceId(String deviceId);
 } 
