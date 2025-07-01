@@ -5,6 +5,7 @@ import com.mmw.metal_micro_wire_backend.dto.device.*;
 import com.mmw.metal_micro_wire_backend.entity.Device;
 import com.mmw.metal_micro_wire_backend.repository.DeviceRepository;
 import com.mmw.metal_micro_wire_backend.service.DeviceService;
+import com.mmw.metal_micro_wire_backend.util.HuaweiIotMessageUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,7 @@ import java.util.Optional;
 public class DeviceServiceImpl implements DeviceService {
     
     private final DeviceRepository deviceRepository;
+    private final HuaweiIotMessageUtil huaweiIotMessageUtil;
     
     @Override
     public BaseResponse<DevicePageResponse> getDeviceList(DevicePageRequest request) {
@@ -109,14 +111,31 @@ public class DeviceServiceImpl implements DeviceService {
             
             Device device = deviceOpt.get();
             
-            // 根据需求，暂时只打印日志，不操作数据库
+            // 准备发送的控制消息
+            String message = request.getTargetStatus() == Device.DeviceStatus.ON ? "ON" : "OFF";
+            String messageName = "CMD_ON_OFF";
             String action = request.getTargetStatus() == Device.DeviceStatus.ON ? "启动" : "停止";
+            
             log.info("开始{}设备，设备ID：{}，当前状态：{}，目标状态：{}", 
                     action, device.getDeviceId(), device.getStatus(), request.getTargetStatus());
             
-            // TODO: 这里可以添加实际的设备控制逻辑，比如发送MQTT消息等
+            // 发送控制消息到华为云IoT设备
+            boolean success = huaweiIotMessageUtil.sendMessage(
+                    request.getDeviceId(), 
+                    message, 
+                    messageName
+            );
             
-            return BaseResponse.success(null);
+            if (success) {
+                log.info("设备控制消息发送成功：设备ID={}，消息={}，动作={}", 
+                        request.getDeviceId(), message, action);
+                return BaseResponse.<Void>success("控制消息已送达，请等待设备" + action + "完成", null);
+            } else {
+                log.error("设备控制消息发送失败：设备ID={}，消息={}，动作={}", 
+                        request.getDeviceId(), message, action);
+                return BaseResponse.error("设备控制消息发送失败");
+            }
+            
         } catch (Exception e) {
             log.error("控制设备失败", e);
             return BaseResponse.error("控制设备失败：" + e.getMessage());

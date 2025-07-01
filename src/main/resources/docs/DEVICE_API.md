@@ -132,7 +132,11 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 
 **权限要求：** 仅管理员用户（roleId=1）
 
-**说明：** 当前版本暂时只打印日志，不修改数据库中的设备状态
+**说明：** 
+- 此接口向华为云IoT设备发送控制命令消息（消息名：CMD_ON_OFF，内容：ON/OFF）
+- 由于硬件限制，无法获得设备的实时响应确认，只能确认消息已送达IoT平台
+- 设备状态的实际更新通过AMQP消息异步完成，系统会自动监听并更新数据库中的设备状态
+- 客户端应通过轮询设备状态接口或实现状态变化监听来获取最新状态
 
 **请求体：**
 ```json
@@ -146,11 +150,20 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 - deviceId: 设备ID，必填
 - targetStatus: 目标状态，可选值：ON、OFF
 
-**响应示例：**
+**成功响应示例：**
 ```json
 {
   "code": "Success",
-  "msg": "操作成功",
+  "msg": "控制消息已送达，请等待设备启动完成",
+  "data": null
+}
+```
+
+**失败响应示例：**
+```json
+{
+  "code": "Error",
+  "msg": "设备控制消息发送失败",
   "data": null
 }
 ```
@@ -193,6 +206,9 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 
 1. 所有接口都需要在请求头中携带有效的认证Token
 2. 管理员功能需要用户的roleId为1
-3. 设备控制功能当前只打印日志，不修改数据库状态
+3. **设备控制为异步操作**：
+   - 控制接口仅确认消息发送状态，不代表设备已完成状态切换
+   - 设备实际状态通过AMQP消息异步更新，可能存在1-5秒的延迟
+   - 建议在发送控制命令后，间隔2-3秒后查询设备状态确认是否切换成功
 4. 设备ID创建后不可修改，删除设备会永久删除相关数据
 5. 分页查询支持按设备状态筛选，提高查询效率 

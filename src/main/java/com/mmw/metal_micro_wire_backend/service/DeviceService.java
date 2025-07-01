@@ -31,8 +31,12 @@ public interface DeviceService {
     
     /**
      * 控制设备（启停）
+     * 
+     * 说明：此方法向设备发送控制命令消息，由于硬件限制无法获得实时响应，
+     * 只能确认消息已送达。设备状态的实际更新通过AMQP消息监听异步完成。
+     * 
      * @param request 控制请求
-     * @return 操作结果
+     * @return 操作结果（消息发送状态）
      */
     BaseResponse<Void> controlDevice(DeviceControlRequest request);
     

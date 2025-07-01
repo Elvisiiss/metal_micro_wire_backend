@@ -33,7 +33,7 @@ public class DeviceController {
             @Valid DevicePageRequest request,
             HttpServletRequest httpRequest) {
         
-        Integer userId = (Integer) httpRequest.getAttribute("userId");
+        Long userId = (Long) httpRequest.getAttribute("userId");
         log.info("用户{}查询设备列表，页码：{}，每页大小：{}，状态筛选：{}", 
                 userId, request.getPage(), request.getSize(), request.getStatus());
         
@@ -50,7 +50,7 @@ public class DeviceController {
             @PathVariable String deviceId,
             HttpServletRequest httpRequest) {
         
-        Integer userId = (Integer) httpRequest.getAttribute("userId");
+        Long userId = (Long) httpRequest.getAttribute("userId");
         log.info("用户{}查询设备信息，设备ID：{}", userId, deviceId);
         
         BaseResponse<DeviceResponse> response = deviceService.getDeviceById(deviceId);
@@ -68,7 +68,7 @@ public class DeviceController {
         
         // 权限检查：仅管理员
         Integer roleId = (Integer) httpRequest.getAttribute("roleId");
-        Integer userId = (Integer) httpRequest.getAttribute("userId");
+        Long userId = (Long) httpRequest.getAttribute("userId");
         
         if (roleId == null || roleId != 1) {
             log.warn("用户{}尝试创建设备但权限不足，roleId：{}", userId, roleId);
@@ -92,7 +92,7 @@ public class DeviceController {
         
         // 权限检查：仅管理员
         Integer roleId = (Integer) httpRequest.getAttribute("roleId");
-        Integer userId = (Integer) httpRequest.getAttribute("userId");
+        Long userId = (Long) httpRequest.getAttribute("userId");
         
         if (roleId == null || roleId != 1) {
             log.warn("用户{}尝试删除设备但权限不足，roleId：{}", userId, roleId);
@@ -108,7 +108,10 @@ public class DeviceController {
     /**
      * 控制设备（启停）
      * 权限：仅管理员用户（roleId=1）
-     * 注意：暂时只打印日志，不操作数据库
+     * 
+     * 说明：向设备发送控制命令消息，消息送达后返回成功。
+     * 由于硬件限制，无法获得设备的实时响应，设备状态的实际更新
+     * 通过AMQP消息监听异步完成，客户端需要轮询设备状态或监听状态变化。
      */
     @PostMapping("/control")
     public ResponseEntity<BaseResponse<Void>> controlDevice(
@@ -117,7 +120,7 @@ public class DeviceController {
         
         // 权限检查：仅管理员
         Integer roleId = (Integer) httpRequest.getAttribute("roleId");
-        Integer userId = (Integer) httpRequest.getAttribute("userId");
+        Long userId = (Long) httpRequest.getAttribute("userId");
         
         if (roleId == null || roleId != 1) {
             log.warn("用户{}尝试控制设备但权限不足，roleId：{}", userId, roleId);
