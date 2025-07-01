@@ -110,12 +110,6 @@
 			<version>3.1.1</version>
 		</dependency>
 
-		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
-			<version>42.7.3</version> <!-- 2025年最新稳定版 -->
-		</dependency>
-
 		<!-- 华为云amqp -->
 		<!-- amqp 1.0 qpid client -->
 		<dependency>

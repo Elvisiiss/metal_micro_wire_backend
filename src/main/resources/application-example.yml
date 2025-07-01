@@ -1,8 +1,16 @@
+#  -- 创建时设置兼容模式，openGauss可通过该命令创建兼容MySQL语法的数据库
+#    CREATE DATABASE metal_micro_wire DBCOMPATIBILITY = 'B';
+
 spring:
   application:
     name: metal_micro_wire_backend
 
   # 数据库配置
+  # datasource:
+  #   url: jdbc:mysql://localhost:3306/metal_micro_wire?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8
+  #   username: username
+  #   password: password
+  #   driver-class-name: com.mysql.cj.jdbc.Driver
   datasource:
     url: jdbc:postgresql://127.0.0.1:5432/postgres?useSSL=false&serverTimezone=Asia/Shanghai
     username: username
