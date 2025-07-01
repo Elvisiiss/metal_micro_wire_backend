@@ -20,6 +20,24 @@ import java.time.LocalDateTime;
 public class Device {
     
     /**
+     * 设备状态枚举
+     */
+    public enum DeviceStatus {
+        ON("ON"),
+        OFF("OFF");
+        
+        private final String value;
+        
+        DeviceStatus(String value) {
+            this.value = value;
+        }
+        
+        public String getValue() {
+            return value;
+        }
+    }
+    
+    /**
      * 设备ID - 主键
      */
     @Id
@@ -29,8 +47,10 @@ public class Device {
     /**
      * 设备状态 (ON/OFF)
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private String status;
+    @Builder.Default
+    private DeviceStatus status = DeviceStatus.OFF;
     
     /**
      * 创建时间

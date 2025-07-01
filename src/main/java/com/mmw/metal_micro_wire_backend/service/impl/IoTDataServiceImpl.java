@@ -148,8 +148,11 @@ public class IoTDataServiceImpl implements IoTDataService {
                 throw new IllegalArgumentException("未找到STATUS字段");
             }
             
-            // 验证状态值
-            if (!isValidStatus(status)) {
+            // 验证并转换状态值
+            Device.DeviceStatus deviceStatus;
+            try {
+                deviceStatus = Device.DeviceStatus.valueOf(status);
+            } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("无效的设备状态: " + status + "，只允许 ON 或 OFF");
             }
             
@@ -158,7 +161,7 @@ public class IoTDataServiceImpl implements IoTDataService {
                     .orElseThrow(() -> new IllegalArgumentException("设备不存在: " + deviceId));
             
             // 更新设备状态
-            device.setStatus(status);
+            device.setStatus(deviceStatus);
             
             return saveDevice(device);
             
@@ -275,10 +278,5 @@ public class IoTDataServiceImpl implements IoTDataService {
         return null;
     }
     
-    /**
-     * 验证设备状态值是否有效
-     */
-    private boolean isValidStatus(String status) {
-        return "ON".equals(status) || "OFF".equals(status);
-    }
+
 }
