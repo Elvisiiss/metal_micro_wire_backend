@@ -3,6 +3,7 @@ package com.mmw.metal_micro_wire_backend.controller;
 import com.mmw.metal_micro_wire_backend.dto.BaseResponse;
 import com.mmw.metal_micro_wire_backend.dto.auth.UserInfoResponse;
 import com.mmw.metal_micro_wire_backend.dto.auth.UserManageRequest;
+import com.mmw.metal_micro_wire_backend.dto.auth.UserPageResponse;
 import com.mmw.metal_micro_wire_backend.entity.User;
 import com.mmw.metal_micro_wire_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ public class RootController {
      * 获取所有用户列表（分页）
      */
     @GetMapping("/users")
-    public ResponseEntity<BaseResponse<Page<UserInfoResponse>>> getUserList(
+    public ResponseEntity<BaseResponse<UserPageResponse>> getUserList(
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "10") @Min(1) int size,
             @RequestParam(required = false) String keyword,
@@ -74,8 +75,9 @@ public class RootController {
             }
             
             Page<UserInfoResponse> responsePage = userPage.map(this::convertToUserInfoResponse);
+            UserPageResponse pageResponse = UserPageResponse.fromPage(responsePage);
             
-            return ResponseEntity.ok(BaseResponse.success("获取成功", responsePage));
+            return ResponseEntity.ok(BaseResponse.success("获取成功", pageResponse));
             
         } catch (Exception e) {
             log.error("获取用户列表失败，错误：{}", e.getMessage());
