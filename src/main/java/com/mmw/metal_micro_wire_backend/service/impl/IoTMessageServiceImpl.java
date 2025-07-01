@@ -3,6 +3,7 @@ package com.mmw.metal_micro_wire_backend.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mmw.metal_micro_wire_backend.config.HuaweiIotConfig;
+import com.mmw.metal_micro_wire_backend.service.IoTDataService;
 import com.mmw.metal_micro_wire_backend.service.IoTMessageService;
 import com.mmw.metal_micro_wire_backend.util.HuaweiIotAmqpUtil;
 
@@ -25,6 +26,7 @@ public class IoTMessageServiceImpl implements IoTMessageService {
     
     private final HuaweiIotAmqpUtil huaweiIotAmqpUtil;
     private final HuaweiIotConfig huaweiIotConfig;
+    private final IoTDataService ioTDataService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private String currentListenerId;
     
@@ -121,8 +123,11 @@ public class IoTMessageServiceImpl implements IoTMessageService {
         try {
             // 这里可以根据不同的消息类型进行不同的处理
             // 但暂时只记录和保存原始消息
+            if (huaweiIotConfig.getMessage().isEnableDetailedLogging()) {
+                log.info("开始处理消息，消息大小: {} 字符", rawMessage.length());
+                log.info("原始消息内容: {}", rawMessage);
+            }
             
-            log.info("开始处理消息，消息大小: {} 字符", rawMessage.length());
             
             // TODO: 在这里添加具体的业务处理逻辑
             // 例如：
@@ -131,14 +136,14 @@ public class IoTMessageServiceImpl implements IoTMessageService {
             // 3. 根据消息内容触发特定的业务逻辑
             // 4. 进行数据统计和分析
             
-            // 示例：检查是否是属性上报消息
+            // 检查是否是属性上报消息
             if (isPropertyReportMessage(messageNode)) {
                 handlePropertyReportMessage(rawMessage, messageNode);
-            } else {
-                handleOtherMessage(rawMessage, messageNode);
             }
             
-            log.info("消息处理完成");
+            if (huaweiIotConfig.getMessage().isEnableDetailedLogging()) {
+                log.info("消息处理完成");
+            }
             
         } catch (Exception e) {
             log.error("灵活消息处理失败", e);
@@ -165,39 +170,88 @@ public class IoTMessageServiceImpl implements IoTMessageService {
         log.info("检测到属性上报消息，开始处理...");
         
         try {
-            // 尝试提取服务数据，但不强制要求特定格式
+            // 提取消息类型
+            String messageType = extractMessageType(messageNode);
+            if (messageType == null) {
+                log.warn("未找到消息类型，跳过处理");
+                return;
+            }
+            
+            if (huaweiIotConfig.getMessage().isEnableDetailedLogging()) {
+                log.info("消息类型: {}", messageType);
+            }
+            
+            // 根据消息类型进行不同的处理
+            switch (messageType.toLowerCase()) {
+                case "detection":
+                    // 检测数据 - 保存线材信息
+                    try {
+                        ioTDataService.parseAndSaveWireMaterial(messageNode);
+                        if (huaweiIotConfig.getMessage().isEnableDetailedLogging()) {
+                            log.info("成功处理检测数据消息");
+                        }
+                    } catch (Exception e) {
+                        log.error("处理检测数据消息失败", e);
+                    }
+                    break;
+                    
+                case "status":
+                    // 状态数据 - 保存设备状态
+                    try {
+                        ioTDataService.parseAndSaveDevice(messageNode);
+                        if (huaweiIotConfig.getMessage().isEnableDetailedLogging()) {
+                            log.info("成功处理设备状态消息");
+                        }
+                    } catch (Exception e) {
+                        log.error("处理设备状态消息失败", e);
+                    }
+                    break;
+                    
+                case "question":
+                    // 问题数据 - 保存问题信息
+                    try {
+                        ioTDataService.parseAndSaveQuestion(messageNode);
+                        if (huaweiIotConfig.getMessage().isEnableDetailedLogging()) {
+                            log.info("成功处理问题消息");
+                        }
+                    } catch (Exception e) {
+                        log.error("处理问题消息失败", e);
+                    }
+                    break;
+                    
+                default:
+                    log.warn("未知的消息类型: {}", messageType);
+                    break;
+            }
+            
+        } catch (Exception e) {
+            log.error("处理属性上报消息时出现异常", e);
+        }
+    }
+    
+    /**
+     * 提取消息类型
+     */
+    private String extractMessageType(JsonNode messageNode) {
+        try {
             JsonNode notifyData = messageNode.get("notify_data");
             if (notifyData != null) {
                 JsonNode body = notifyData.get("body");
                 if (body != null) {
                     JsonNode services = body.get("services");
-                    if (services != null && services.isArray()) {
-                        log.info("找到 {} 个服务数据", services.size());
-                        for (int i = 0; i < services.size(); i++) {
-                            JsonNode service = services.get(i);
-                            String serviceId = getTextValue(service, "service_id");
-                            JsonNode properties = service.get("properties");
-                            log.info("服务 {}: ID={}, 属性数量={}", 
-                                    i + 1, 
-                                    serviceId != null ? serviceId : "未知",
-                                    properties != null ? properties.size() : 0);
+                    if (services != null && services.isArray() && services.size() > 0) {
+                        JsonNode firstService = services.get(0);
+                        JsonNode properties = firstService.get("properties");
+                        if (properties != null) {
+                            return getTextValue(properties, "TYPE");
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            log.warn("提取属性上报详细信息时出现异常，但不影响消息处理", e);
+            log.debug("提取消息类型时出现异常", e);
         }
-        
-        // TODO: 添加属性上报的具体业务逻辑
-    }
-    
-    /**
-     * 处理其他类型消息
-     */
-    private void handleOtherMessage(String rawMessage, JsonNode messageNode) {
-        log.info("处理其他类型消息");
-        // TODO: 添加其他消息类型的处理逻辑
+        return null;
     }
     
     /**

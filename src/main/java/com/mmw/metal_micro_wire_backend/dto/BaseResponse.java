@@ -48,6 +48,14 @@ public class BaseResponse<T> {
                 .build();
     }
     
+    public static <T> BaseResponse<T> success(T data) {
+        return BaseResponse.<T>builder()
+                .msg("操作成功")
+                .code("success")
+                .data(data)
+                .build();
+    }
+    
     // 失败响应的静态方法
     public static <T> BaseResponse<T> error(String msg) {
         return BaseResponse.<T>builder()
