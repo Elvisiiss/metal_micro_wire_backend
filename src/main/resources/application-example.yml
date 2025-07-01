@@ -4,10 +4,10 @@ spring:
 
   # 数据库配置
   datasource:
-    url: jdbc:mysql://localhost:3306/metal_micro_wire_new?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8
+    url: jdbc:postgresql://127.0.0.1:5432/postgres?useSSL=false&serverTimezone=Asia/Shanghai
     username: username
     password: password
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.postgresql.Driver
 
   # JPA配置
   jpa:
@@ -19,10 +19,13 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
+        jdbc:
+          lob:
+            non_contextual_creation: true
 
   # 邮件配置
   mail:
-    host: smtp.qq.com
+    host: smtp.exmail.qq.com
     port: 465
     username: username
     password: password
@@ -34,7 +37,7 @@ spring:
             enable: true
           ssl:
             enable: true
-  
+
   # Redis配置
   data:
     redis:
@@ -69,7 +72,7 @@ huawei:
     endpoint: https://1ef972c084.st1.iotda-app.cn-north-4.myhuaweicloud.com
     project-id: 768eb2550b2146a39048ba0330c487c9
     region: cn-north-4
-    
+
     # AMQP连接配置 - 用于接收设备消息
     amqp:
       host: 1ef972c084.st1.iotda-app.cn-north-4.myhuaweicloud.com

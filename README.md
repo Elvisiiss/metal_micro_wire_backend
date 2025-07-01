@@ -304,3 +304,6 @@ CREATE TABLE user_root (
 
 > 💡 **提示**: 更多详细信息请查看 `src/main/resources/docs/` 目录下的API文档。
 
+
+### 必要的代码
+- **创建数据库**：create database metal_micro_wire dbcompatibility ='B';
