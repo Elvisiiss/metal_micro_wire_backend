@@ -32,11 +32,11 @@ verification:
 ### 数据库配置
 ```yaml
 spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/metal_micro_wire_new?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8
-    username: root
-    password: your_password
-    driver-class-name: com.mysql.cj.jdbc.Driver
+   datasource:
+      url: jdbc:postgresql://127.0.0.1:5432/postgres?useSSL=false&serverTimezone=Asia/Shanghai
+      username: username
+      password: password
+      driver-class-name: org.postgresql.Driver
 ```
 
 ### Redis配置
