@@ -32,7 +32,7 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 **响应示例：**
 ```json
 {
-  "code": "Success",
+  "code": "success",
   "msg": "操作成功",
   "data": {
     "devices": [
@@ -65,7 +65,7 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 **响应示例：**
 ```json
 {
-  "code": "Success",
+  "code": "success",
   "msg": "操作成功",
   "data": {
     "deviceId": "device001",
@@ -85,19 +85,20 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 **请求体：**
 ```json
 {
-  "deviceId": "device001",
-  "status": "OFF"
+  "deviceId": "device001"
 }
 ```
 
 **字段说明：**
 - deviceId: 设备ID，必填，只能包含字母、数字、下划线和连字符
-- status: 初始状态，可选，默认OFF
+
+**说明：**
+- 设备初始状态固定为OFF，由后端自动设置，无需前端传递
 
 **响应示例：**
 ```json
 {
-  "code": "Success",
+  "code": "success",
   "msg": "操作成功",
   "data": {
     "deviceId": "device001",
@@ -120,7 +121,7 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 **响应示例：**
 ```json
 {
-  "code": "Success",
+  "code": "success",
   "msg": "操作成功",
   "data": null
 }
@@ -153,7 +154,7 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 **成功响应示例：**
 ```json
 {
-  "code": "Success",
+  "code": "success",
   "msg": "控制消息已送达，请等待设备启动完成",
   "data": null
 }
@@ -164,6 +165,46 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 {
   "code": "Error",
   "msg": "设备控制消息发送失败",
+  "data": null
+}
+```
+
+### 6. 测试设备注册状态
+
+**接口地址：** `POST /api/device/test-connection`
+
+**权限要求：** 仅管理员用户（roleId=1）
+
+**说明：** 
+- 此接口向指定设备发送测试消息（消息名：connect，内容：test）
+- 用于验证设备是否在华为云IoT平台上注册，而非设备在线状态
+- 华为云消息有缓存机制，消息能够送达即表示设备ID已在平台注册
+- 不能用于判断设备是否在线，只能确认设备是否已注册
+
+**请求体：**
+```json
+{
+  "deviceId": "device001"
+}
+```
+
+**字段说明：**
+- deviceId: 设备ID，必填，只能包含字母、数字、下划线和连字符
+
+**成功响应示例：**
+```json
+{
+  "code": "success",
+  "msg": "测试消息已发送，设备已在华为云IoT平台注册",
+  "data": null
+}
+```
+
+**失败响应示例：**
+```json
+{
+  "code": "Error",
+  "msg": "测试消息发送失败，设备可能未在华为云IoT平台注册",
   "data": null
 }
 ```
@@ -206,9 +247,18 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 
 1. 所有接口都需要在请求头中携带有效的认证Token
 2. 管理员功能需要用户的roleId为1
-3. **设备控制为异步操作**：
+3. **设备创建规则**：
+   - 设备初始状态固定为OFF，由后端自动设置
+   - 前端只需传递设备ID，无需传递状态参数
+   - 设备ID必须唯一，不可重复
+4. **设备控制为异步操作**：
    - 控制接口仅确认消息发送状态，不代表设备已完成状态切换
    - 设备实际状态通过AMQP消息异步更新，可能存在1-5秒的延迟
    - 建议在发送控制命令后，间隔2-3秒后查询设备状态确认是否切换成功
-4. 设备ID创建后不可修改，删除设备会永久删除相关数据
-5. 分页查询支持按设备状态筛选，提高查询效率 
+5. **测试设备注册功能**：
+   - 测试消息（消息名：connect，内容：test）用于验证设备是否在华为云IoT平台注册
+   - 该功能不会更改设备状态，仅用于注册状态检查
+   - 华为云消息有缓存机制，消息能够送达即表示设备ID已注册
+   - 无法判断设备实际在线状态，只能确认注册状态
+6. 设备ID创建后不可修改，删除设备会永久删除相关数据
+7. 分页查询支持按设备状态筛选，提高查询效率 

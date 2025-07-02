@@ -1,16 +1,15 @@
 package com.mmw.metal_micro_wire_backend.dto.device;
 
-
 import lombok.Data;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 /**
- * 创建设备请求DTO
+ * 测试设备连接请求DTO
  */
 @Data
-public class CreateDeviceRequest {
+public class TestConnectionRequest {
     
     /**
      * 设备ID

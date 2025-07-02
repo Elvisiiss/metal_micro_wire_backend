@@ -3,6 +3,7 @@ package com.mmw.metal_micro_wire_backend.controller;
 import com.mmw.metal_micro_wire_backend.dto.BaseResponse;
 import com.mmw.metal_micro_wire_backend.dto.device.*;
 import com.mmw.metal_micro_wire_backend.service.DeviceService;
+import com.mmw.metal_micro_wire_backend.util.HuaweiIotMessageUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ import jakarta.validation.Valid;
 public class DeviceController {
     
     private final DeviceService deviceService;
+    private final HuaweiIotMessageUtil huaweiIotMessageUtil;
     
     /**
      * 分页查询设备列表
@@ -133,5 +135,51 @@ public class DeviceController {
         
         BaseResponse<Void> response = deviceService.controlDevice(request);
         return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * 测试设备注册状态
+     * 权限：仅管理员用户（roleId=1）
+     * 
+     * 说明：向指定设备发送测试连接消息（消息名：connect，内容：test）
+     * 用于验证设备是否在华为云IoT平台上注册，而非设备在线状态
+     * 华为云消息有缓存机制，消息能够送达即表示设备ID已在平台注册
+     */
+    @PostMapping("/test-connection")
+    public ResponseEntity<BaseResponse<Void>> testConnection(
+            @Valid @RequestBody TestConnectionRequest request,
+            HttpServletRequest httpRequest) {
+        
+        // 权限检查：仅管理员
+        Integer roleId = (Integer) httpRequest.getAttribute("roleId");
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        
+        if (roleId == null || roleId != 1) {
+            log.warn("用户{}尝试测试设备注册状态但权限不足，roleId：{}", userId, roleId);
+            return ResponseEntity.ok(BaseResponse.error("权限不足，仅管理员可测试设备注册状态"));
+        }
+        
+        try {
+            log.info("管理员用户{}测试设备注册状态，设备ID：{}", userId, request.getDeviceId());
+            
+            // 发送测试连接消息，验证设备注册状态
+            boolean success = huaweiIotMessageUtil.sendMessage(
+                    request.getDeviceId(), 
+                    "test", 
+                    "connect"
+            );
+            
+            if (success) {
+                log.info("设备注册状态测试消息发送成功：设备ID={}", request.getDeviceId());
+                return ResponseEntity.ok(BaseResponse.<Void>success("测试消息已发送，设备已在华为云IoT平台注册", null));
+            } else {
+                log.error("设备注册状态测试消息发送失败：设备ID={}", request.getDeviceId());
+                return ResponseEntity.ok(BaseResponse.error("测试消息发送失败，设备可能未在华为云IoT平台注册"));
+            }
+            
+        } catch (Exception e) {
+            log.error("测试设备注册状态失败：设备ID={}，错误={}", request.getDeviceId(), e.getMessage(), e);
+            return ResponseEntity.ok(BaseResponse.error("测试失败：" + e.getMessage()));
+        }
     }
 } 
