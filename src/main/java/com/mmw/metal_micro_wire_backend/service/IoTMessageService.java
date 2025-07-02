@@ -1,5 +1,7 @@
 package com.mmw.metal_micro_wire_backend.service;
 
+import com.mmw.metal_micro_wire_backend.dto.iot.IoTListenerStatusResponse;
+
 /**
  * IoT消息处理服务接口
  * 采用灵活的消息处理方式，避免固定DTO结构的限制
@@ -22,4 +24,10 @@ public interface IoTMessageService {
      * 停止消息监听
      */
     void stopMessageListener();
+    
+    /**
+     * 获取监听器状态
+     * @return 监听器状态信息
+     */
+    IoTListenerStatusResponse getListenerStatus();
 } 

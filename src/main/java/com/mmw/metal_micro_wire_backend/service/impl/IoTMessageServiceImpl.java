@@ -3,6 +3,7 @@ package com.mmw.metal_micro_wire_backend.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mmw.metal_micro_wire_backend.config.HuaweiIotConfig;
+import com.mmw.metal_micro_wire_backend.dto.iot.IoTListenerStatusResponse;
 import com.mmw.metal_micro_wire_backend.service.IoTDataService;
 import com.mmw.metal_micro_wire_backend.service.IoTMessageService;
 import com.mmw.metal_micro_wire_backend.util.HuaweiIotAmqpUtil;
@@ -29,6 +30,7 @@ public class IoTMessageServiceImpl implements IoTMessageService {
     private final IoTDataService ioTDataService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private String currentListenerId;
+    private Long listenerStartTime;
     
     // 消息统计
     private final AtomicLong totalMessageCount = new AtomicLong(0);
@@ -287,11 +289,20 @@ public class IoTMessageServiceImpl implements IoTMessageService {
     @Override
     public void startMessageListener() {
         try {
+            // 如果已有监听器在运行，先停止它
+            if (currentListenerId != null) {
+                log.info("检测到已有监听器运行，ID: {}，先停止旧监听器", currentListenerId);
+                huaweiIotAmqpUtil.stopListener(currentListenerId);
+                currentListenerId = null;
+                listenerStartTime = null;
+            }
+            
             log.info("启动IoT消息监听器...");
             CompletableFuture<String> future = huaweiIotAmqpUtil.startDefaultQueueListener(this::processRawMessage);
             
             future.thenAccept(listenerId -> {
                 this.currentListenerId = listenerId;
+                this.listenerStartTime = System.currentTimeMillis();
                 log.info("IoT消息监听器启动成功，ID: {}", listenerId);
             }).exceptionally(throwable -> {
                 log.error("启动IoT消息监听器失败", throwable);
@@ -308,11 +319,33 @@ public class IoTMessageServiceImpl implements IoTMessageService {
             if (currentListenerId != null) {
                 huaweiIotAmqpUtil.stopListener(currentListenerId);
                 currentListenerId = null;
+                listenerStartTime = null;
                 log.info("IoT消息监听器已停止");
             }
         } catch (Exception e) {
             log.error("停止监听器异常", e);
         }
+    }
+    
+    @Override
+    public IoTListenerStatusResponse getListenerStatus() {
+        // 创建消息统计
+        long total = totalMessageCount.get();
+        long success = successMessageCount.get();
+        long failed = failedMessageCount.get();
+        double successRate = total > 0 ? (double) success / total * 100 : 0;
+        
+        IoTListenerStatusResponse.MessageStats messageStats = new IoTListenerStatusResponse.MessageStats(
+                total, success, failed, successRate
+        );
+        
+        // 创建状态响应
+        return new IoTListenerStatusResponse(
+                currentListenerId != null, // 是否正在监听
+                currentListenerId,         // 监听器ID
+                listenerStartTime,         // 启动时间
+                messageStats               // 消息统计
+        );
     }
     
     @PreDestroy

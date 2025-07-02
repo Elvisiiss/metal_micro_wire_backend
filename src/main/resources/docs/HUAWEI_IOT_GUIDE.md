@@ -161,14 +161,266 @@ private void handlePropertyReportMessage(String rawMessage, JsonNode messageNode
 
 ## 3. API接口
 
-### 3.1 启动监听
+本系统提供了完整的IoT监听器管理API，支持启动、停止和状态查询功能。
+
+### 3.1 启动监听器
+
+#### 接口信息
+- **请求方式**: `POST`
+- **请求路径**: `/api/iot/start`
+- **功能描述**: 启动IoT消息监听器，开始接收华为云IoT平台推送的消息
+
+#### 请求示例
 ```http
 POST /api/iot/start
+Content-Type: application/json
 ```
 
-### 3.2 停止监听
+#### 响应格式
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": "IoT消息监听已开启"
+}
+```
+
+#### 响应说明
+- **成功响应** (200): 监听器启动成功
+- **失败响应** (500): 启动失败，返回具体错误信息
+
+#### 特殊行为
+- 如果已有监听器在运行，会先停止旧监听器再启动新的
+- 启动成功后会自动记录启动时间和监听器ID
+- 支持重复调用，不会产生资源泄漏
+
+#### 使用场景
+- 系统初始化时启动监听
+- 重新连接华为云IoT平台
+- 故障恢复后重启监听
+
+### 3.2 停止监听器
+
+#### 接口信息
+- **请求方式**: `POST`
+- **请求路径**: `/api/iot/stop`
+- **功能描述**: 停止IoT消息监听器，断开与华为云IoT平台的连接
+
+#### 请求示例
 ```http
 POST /api/iot/stop
+Content-Type: application/json
+```
+
+#### 响应格式
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": "IoT消息监听已关闭"
+}
+```
+
+#### 响应说明
+- **成功响应** (200): 监听器停止成功
+- **失败响应** (500): 停止失败，返回具体错误信息
+
+#### 特殊行为
+- 如果当前没有运行的监听器，调用此接口不会报错
+- 停止后会清理所有相关资源和统计信息
+- 应用关闭时会自动调用此方法进行清理
+
+#### 使用场景
+- 系统维护前停止监听
+- 临时断开IoT连接
+- 故障排查时停止监听
+
+### 3.3 查询监听器状态
+
+#### 接口信息
+- **请求方式**: `GET`
+- **请求路径**: `/api/iot/status`
+- **功能描述**: 获取当前IoT监听器的运行状态和消息处理统计信息
+
+#### 请求示例
+```http
+GET /api/iot/status
+```
+
+#### 响应格式
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "isListening": true,
+    "listenerId": "DefaultQueue_1703123456789",
+    "startTime": 1703123456789,
+    "messageStats": {
+      "totalCount": 150,
+      "successCount": 145,
+      "failedCount": 5,
+      "successRate": 96.67
+    }
+  }
+}
+```
+
+#### 响应字段说明
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| `isListening` | boolean | 是否正在监听（true=监听中，false=已停止） |
+| `listenerId` | string | 监听器唯一标识ID，停止时为null |
+| `startTime` | long | 监听器启动时间戳（毫秒），停止时为null |
+| `messageStats` | object | 消息处理统计信息 |
+| `messageStats.totalCount` | long | 总共接收的消息数量 |
+| `messageStats.successCount` | long | 成功处理的消息数量 |
+| `messageStats.failedCount` | long | 处理失败的消息数量 |
+| `messageStats.successRate` | double | 消息处理成功率（百分比） |
+
+#### 状态示例
+
+**监听器运行中**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "isListening": true,
+    "listenerId": "DefaultQueue_1703123456789",
+    "startTime": 1703123456789,
+    "messageStats": {
+      "totalCount": 150,
+      "successCount": 145,
+      "failedCount": 5,
+      "successRate": 96.67
+    }
+  }
+}
+```
+
+**监听器已停止**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "isListening": false,
+    "listenerId": null,
+    "startTime": null,
+    "messageStats": {
+      "totalCount": 0,
+      "successCount": 0,
+      "failedCount": 0,
+      "successRate": 0.0
+    }
+  }
+}
+```
+
+#### 使用场景
+- 前端页面实时显示监听器状态
+- 系统健康检查和监控
+- 故障诊断和性能分析
+- 自动化运维脚本状态检查
+
+#### 监控建议
+- **状态轮询**: 建议每30秒查询一次状态
+- **告警阈值**: 成功率低于95%时需要关注
+- **运行时间**: 监控异常重启情况
+- **消息量**: 监控消息处理量是否正常
+
+### 3.4 API调用流程
+
+#### 典型使用流程
+```
+1. 启动监听: POST /api/iot/start
+2. 状态检查: GET /api/iot/status
+3. 业务运行: (自动处理消息)
+4. 定期监控: GET /api/iot/status
+5. 停止监听: POST /api/iot/stop
+```
+
+#### 错误处理流程
+```
+1. 调用状态接口检查: GET /api/iot/status
+2. 如果监听器异常，先停止: POST /api/iot/stop
+3. 重新启动监听器: POST /api/iot/start
+4. 验证启动成功: GET /api/iot/status
+```
+
+### 3.5 前端集成示例
+
+#### JavaScript示例
+```javascript
+// 检查监听器状态
+async function checkListenerStatus() {
+  try {
+    const response = await fetch('/api/iot/status');
+    const result = await response.json();
+    
+    if (result.code === 200) {
+      const status = result.data;
+      console.log('监听状态:', status.isListening);
+      console.log('成功率:', status.messageStats.successRate + '%');
+      
+      // 更新前端UI
+      updateStatusUI(status);
+    }
+  } catch (error) {
+    console.error('获取状态失败:', error);
+  }
+}
+
+// 启动监听器
+async function startListener() {
+  try {
+    const response = await fetch('/api/iot/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const result = await response.json();
+    
+    if (result.code === 200) {
+      console.log('启动成功:', result.data);
+      // 启动后检查状态
+      setTimeout(checkListenerStatus, 1000);
+    } else {
+      console.error('启动失败:', result.message);
+    }
+  } catch (error) {
+    console.error('启动异常:', error);
+  }
+}
+
+// 停止监听器
+async function stopListener() {
+  try {
+    const response = await fetch('/api/iot/stop', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const result = await response.json();
+    
+    if (result.code === 200) {
+      console.log('停止成功:', result.data);
+      // 停止后检查状态
+      setTimeout(checkListenerStatus, 500);
+    } else {
+      console.error('停止失败:', result.message);
+    }
+  } catch (error) {
+    console.error('停止异常:', error);
+  }
+}
+
+// 定期检查状态（每30秒）
+setInterval(checkListenerStatus, 30000);
 ```
 
 ## 4. 扩展开发
