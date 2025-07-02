@@ -38,6 +38,7 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
     "devices": [
       {
         "deviceId": "device001",
+        "deviceCode": "01",
         "status": "ON",
         "createTime": "2024-01-01T10:00:00",
         "updateTime": "2024-01-01T10:00:00"
@@ -69,6 +70,7 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
   "msg": "操作成功",
   "data": {
     "deviceId": "device001",
+    "deviceCode": "01",
     "status": "ON",
     "createTime": "2024-01-01T10:00:00",
     "updateTime": "2024-01-01T10:00:00"
@@ -85,15 +87,18 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 **请求体：**
 ```json
 {
-  "deviceId": "device001"
+  "deviceId": "device001",
+  "deviceCode": "01"
 }
 ```
 
 **字段说明：**
 - deviceId: 设备ID，必填，只能包含字母、数字、下划线和连字符
+- deviceCode: 设备代码，可选，必须是两位数字，用于匹配批次号中的机器号（13-14位）
 
 **说明：**
 - 设备初始状态固定为OFF，由后端自动设置，无需前端传递
+- 设备代码用于与线材批次号中的机器号进行关联，实现设备与线材数据的自动匹配
 
 **响应示例：**
 ```json
@@ -102,6 +107,7 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
   "msg": "操作成功",
   "data": {
     "deviceId": "device001",
+    "deviceCode": "01",
     "status": "OFF",
     "createTime": "2024-01-01T10:00:00",
     "updateTime": "2024-01-01T10:00:00"
@@ -238,6 +244,15 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
 }
 ```
 
+### 设备代码已存在
+```json
+{
+  "code": "Error",
+  "msg": "设备代码已存在：01",
+  "data": null
+}
+```
+
 ## 设备状态枚举
 
 - `ON`: 设备开启状态
@@ -260,5 +275,34 @@ GET /api/device/list?page=0&size=10&status=ON&sortBy=createTime&sortDirection=de
    - 该功能不会更改设备状态，仅用于注册状态检查
    - 华为云消息有缓存机制，消息能够送达即表示设备ID已注册
    - 无法判断设备实际在线状态，只能确认注册状态
-6. 设备ID创建后不可修改，删除设备会永久删除相关数据
-7. 分页查询支持按设备状态筛选，提高查询效率 
+6. **设备代码与线材关联**：
+   - 设备代码用于与线材批次号中的机器号（13-14位）进行自动匹配
+   - 批次号格式：Cu0120250629010010001，其中13-14位为检测机器号
+   - 系统在处理线材数据时会自动解析批次号并建立设备关联
+   - 设备代码必须是两位数字，建议按实际机器编号设置
+7. 设备ID创建后不可修改，删除设备会永久删除相关数据
+8. 分页查询支持按设备状态筛选，提高查询效率
+
+## 设备与线材数据关联
+
+设备通过设备代码与线材检测数据进行关联：
+
+### 批次号解析规则
+- 批次号格式：`Cu0120250629010010001`（21位）
+- 第13-14位为检测机器号，对应设备的deviceCode字段
+- 系统自动解析批次号并在线材数据中记录设备代码
+
+### 关联效果
+当IoT设备上报线材检测数据时：
+1. 系统解析批次号中的机器号（13-14位）
+2. 在线材记录中保存设备代码
+3. 可通过设备代码关联查询该设备的所有线材数据
+
+### 查询示例
+```sql
+-- 查询设备代码为"01"的所有线材数据
+SELECT w.*, d.device_id, d.status 
+FROM wire_materials w
+LEFT JOIN devices d ON w.device_code = d.device_code
+WHERE w.device_code = '01';
+```

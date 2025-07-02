@@ -45,6 +45,12 @@ public class Device {
     private String deviceId;
     
     /**
+     * 设备代码（用于匹配批次号中的机器号13-14位）
+     */
+    @Column(name = "device_code", length = 2)
+    private String deviceCode;
+    
+    /**
      * 设备状态 (ON/OFF)
      */
     @Enumerated(EnumType.STRING)

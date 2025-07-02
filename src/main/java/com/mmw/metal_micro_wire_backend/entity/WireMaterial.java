@@ -94,6 +94,18 @@ public class WireMaterial {
     private String contactEmail;
     
     /**
+     * 应用场景编号（从批次号解析得出）
+     */
+    @Column(name = "scenario_code", length = 2)
+    private String scenarioCode;
+    
+    /**
+     * 设备代码（从批次号解析得出，对应批次号13-14位）
+     */
+    @Column(name = "device_code", length = 2)
+    private String deviceCode;
+    
+    /**
      * 事件发生时间
      */
     @Column(name = "event_time", nullable = false)

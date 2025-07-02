@@ -23,6 +23,11 @@ public class DeviceResponse {
     private String deviceId;
     
     /**
+     * 设备代码
+     */
+    private String deviceCode;
+    
+    /**
      * 设备状态
      */
     private Device.DeviceStatus status;
@@ -43,6 +48,7 @@ public class DeviceResponse {
     public static DeviceResponse fromEntity(Device device) {
         return DeviceResponse.builder()
                 .deviceId(device.getDeviceId())
+                .deviceCode(device.getDeviceCode())
                 .status(device.getStatus())
                 .createTime(device.getCreateTime())
                 .updateTime(device.getUpdateTime())

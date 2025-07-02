@@ -77,7 +77,8 @@ public class DeviceController {
             return ResponseEntity.ok(BaseResponse.error("权限不足，仅管理员可创建设备"));
         }
         
-        log.info("管理员用户{}创建设备，设备ID：{}", userId, request.getDeviceId());
+        log.info("管理员用户{}创建设备，设备ID：{}，设备代码：{}", 
+                userId, request.getDeviceId(), request.getDeviceCode());
         
         BaseResponse<DeviceResponse> response = deviceService.createDevice(request);
         return ResponseEntity.ok(response);

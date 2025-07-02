@@ -65,14 +65,24 @@ public class DeviceServiceImpl implements DeviceService {
                 return BaseResponse.error("设备ID已存在：" + request.getDeviceId());
             }
             
+            // 检查设备代码是否已存在（如果设备代码不为空）
+            if (request.getDeviceCode() != null && !request.getDeviceCode().trim().isEmpty()) {
+                Optional<Device> existingDevice = deviceRepository.findByDeviceCode(request.getDeviceCode());
+                if (existingDevice.isPresent()) {
+                    return BaseResponse.error("设备代码已存在：" + request.getDeviceCode());
+                }
+            }
+            
             // 创建设备，初始状态固定为OFF
             Device device = Device.builder()
                     .deviceId(request.getDeviceId())
+                    .deviceCode(request.getDeviceCode())
                     .status(Device.DeviceStatus.OFF)
                     .build();
             
             Device savedDevice = deviceRepository.save(device);
-            log.info("创建设备成功，设备ID：{}，初始状态：OFF", savedDevice.getDeviceId());
+            log.info("创建设备成功，设备ID：{}，设备代码：{}，初始状态：OFF", 
+                    savedDevice.getDeviceId(), savedDevice.getDeviceCode());
             
             return BaseResponse.success(DeviceResponse.fromEntity(savedDevice));
         } catch (Exception e) {

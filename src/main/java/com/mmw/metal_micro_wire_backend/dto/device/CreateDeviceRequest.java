@@ -18,4 +18,10 @@ public class CreateDeviceRequest {
     @NotBlank(message = "设备ID不能为空")
     @Pattern(regexp = "^[a-zA-Z0-9_-]+$", message = "设备ID只能包含字母、数字、下划线和连字符")
     private String deviceId;
+    
+    /**
+     * 设备代码（两位数字，用于匹配批次号中的机器号）
+     */
+    @Pattern(regexp = "^\\d{2}$", message = "设备代码必须是两位数字")
+    private String deviceCode;
 } 

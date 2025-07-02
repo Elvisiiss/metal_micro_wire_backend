@@ -104,6 +104,28 @@ public class IoTDataServiceImpl implements IoTDataService {
                 throw new IllegalArgumentException("批次号不能为空");
             }
             
+            // 解析批次号中的关键信息
+            String scenarioCode = null;
+            String deviceCode = null;
+            
+            if (batchNumber.length() >= 21) {
+                // 批次号格式：Cu0120250629010010001
+                // 3-4位：应用场景编号
+                // 13-14位：检测机器号
+                try {
+                    scenarioCode = batchNumber.substring(2, 4);
+                    deviceCode = batchNumber.substring(12, 14);
+                    
+                    if (huaweiIotConfig.getMessage().isEnableDetailedLogging()) {
+                        log.info("解析批次号：{}，应用场景：{}，设备代码：{}", batchNumber, scenarioCode, deviceCode);
+                    }
+                } catch (Exception e) {
+                    log.warn("解析批次号失败：{}，将保存原始数据", batchNumber, e);
+                }
+            } else {
+                log.warn("批次号长度不足21位：{}，无法解析场景和设备代码", batchNumber);
+            }
+            
             // 解析生产信息
             String[] sourceInfo = EncodingUtil.parseSourceOrigin(sourceOriginRaw);
             
@@ -111,6 +133,8 @@ public class IoTDataServiceImpl implements IoTDataService {
                     .batchNumber(batchNumber)
                     .deviceId(deviceId)
                     .eventTime(eventTime)
+                    .scenarioCode(scenarioCode)
+                    .deviceCode(deviceCode)
                     .diameter(parseDecimalValue(properties, "DIR_s"))
                     .resistance(parseDecimalValue(properties, "RES_s"))
                     .extensibility(parseDecimalValue(properties, "EXT_s"))

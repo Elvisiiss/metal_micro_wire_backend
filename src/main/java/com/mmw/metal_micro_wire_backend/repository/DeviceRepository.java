@@ -27,4 +27,9 @@ public interface DeviceRepository extends JpaRepository<Device, String> {
      * 检查设备ID是否存在
      */
     boolean existsByDeviceId(String deviceId);
+    
+    /**
+     * 根据设备代码查找设备
+     */
+    java.util.Optional<Device> findByDeviceCode(String deviceCode);
 } 
