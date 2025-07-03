@@ -264,6 +264,7 @@ public class AuthServiceImpl implements AuthService {
     public AuthResponse loginWithCode(VerifyCodeRequest request) {
         String email = request.getE_mail();
         String code = request.getMail_code();
+        Boolean remember = request.getRemember();
         
         // 验证验证码
         if (!redisService.verifyCode(email, code, "login")) {
@@ -284,9 +285,8 @@ public class AuthServiceImpl implements AuthService {
                 return AuthResponse.error("账户已被禁用，请联系管理员");
             }
             
-            // 验证码登录默认不记住登录状态
             String token = tokenService.generateAndSaveToken(
-                user.getId(), user.getEmail(), user.getUserName(), user.getRoleId(), false, TokenService.UserType.NORMAL);
+                user.getId(), user.getEmail(), user.getUserName(), user.getRoleId(), remember, TokenService.UserType.NORMAL);
             
             log.info("用户验证码登录成功，邮箱：{}，用户名：{}", user.getEmail(), user.getUserName());
             return AuthResponse.success("成功登录", user.getEmail(), user.getUserName(), user.getRoleId(), token);

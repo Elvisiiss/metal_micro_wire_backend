@@ -196,7 +196,8 @@ export default defineConfig({
 {
   "msg": "登录邮箱验证码",
   "e_mail": "user@example.com",
-  "mail_code": "123456"
+  "mail_code": "123456",
+  "remember": true
 }
 ```
 - **成功响应**:

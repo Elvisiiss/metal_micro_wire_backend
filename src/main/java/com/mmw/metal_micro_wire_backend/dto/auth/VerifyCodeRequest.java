@@ -35,4 +35,9 @@ public class VerifyCodeRequest {
      */
     @NotBlank(message = "验证码不能为空")
     private String mail_code;
+    
+    /**
+     * 是否记住
+     */
+    private Boolean remember;
 } 
