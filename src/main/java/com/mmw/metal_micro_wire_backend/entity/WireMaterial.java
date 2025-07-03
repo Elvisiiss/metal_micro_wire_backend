@@ -112,11 +112,44 @@ public class WireMaterial {
     private LocalDateTime eventTime;
     
     /**
+     * 规则引擎评估结果
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "evaluation_result", length = 10)
+    @Builder.Default
+    private EvaluationResult evaluationResult = EvaluationResult.UNKNOWN;
+    
+    /**
+     * 评估详情（记录不合格的具体指标）
+     */
+    @Column(name = "evaluation_message", length = 500)
+    private String evaluationMessage;
+    
+    /**
      * 创建时间
      */
     @Column(name = "create_time", nullable = false)
     @Builder.Default
     private LocalDateTime createTime = LocalDateTime.now();
+    
+    /**
+     * 评估结果枚举
+     */
+    public enum EvaluationResult {
+        PASS("合格"),
+        FAIL("不合格"), 
+        UNKNOWN("未评估");
+        
+        private final String description;
+        
+        EvaluationResult(String description) {
+            this.description = description;
+        }
+        
+        public String getDescription() {
+            return description;
+        }
+    }
     
     @PrePersist
     public void prePersist() {

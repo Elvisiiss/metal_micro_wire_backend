@@ -52,4 +52,11 @@ public interface ApplicationScenarioService {
      * @return 应用场景列表
      */
     BaseResponse<List<ApplicationScenarioResponse>> getScenariosByWireType(String wireType);
+    
+    /**
+     * 重新评估指定应用场景下的所有线材数据
+     * @param scenarioCode 应用场景编号
+     * @return 重新评估结果
+     */
+    BaseResponse<String> reEvaluateWireMaterials(String scenarioCode);
 } 

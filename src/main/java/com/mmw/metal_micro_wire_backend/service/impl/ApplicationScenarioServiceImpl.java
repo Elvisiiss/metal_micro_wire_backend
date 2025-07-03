@@ -5,6 +5,7 @@ import com.mmw.metal_micro_wire_backend.dto.scenario.*;
 import com.mmw.metal_micro_wire_backend.entity.ApplicationScenario;
 import com.mmw.metal_micro_wire_backend.repository.ApplicationScenarioRepository;
 import com.mmw.metal_micro_wire_backend.service.ApplicationScenarioService;
+import com.mmw.metal_micro_wire_backend.service.RuleEngineService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 public class ApplicationScenarioServiceImpl implements ApplicationScenarioService {
     
     private final ApplicationScenarioRepository applicationScenarioRepository;
+    private final RuleEngineService ruleEngineService;
     
     @Override
     public BaseResponse<ApplicationScenarioPageResponse> getScenarioList(ApplicationScenarioPageRequest request) {
@@ -192,6 +194,14 @@ public class ApplicationScenarioServiceImpl implements ApplicationScenarioServic
             ApplicationScenario savedScenario = applicationScenarioRepository.save(scenario);
             log.info("更新应用场景成功，场景编号：{}，场景名称：{}", savedScenario.getScenarioCode(), savedScenario.getScenarioName());
             
+            // 异步触发重新评估该场景下的线材数据
+            try {
+                int evaluatedCount = ruleEngineService.reEvaluateByScenario(scenarioCode);
+                log.info("应用场景更新后自动重新评估完成，场景编号：{}，处理数据条数：{}", scenarioCode, evaluatedCount);
+            } catch (Exception e) {
+                log.warn("应用场景更新后自动重新评估失败，场景编号：{}，错误：{}", scenarioCode, e.getMessage());
+            }
+            
             return BaseResponse.success(ApplicationScenarioResponse.fromEntity(savedScenario));
         } catch (Exception e) {
             log.error("更新应用场景失败，场景编号：{}", scenarioCode, e);
@@ -229,6 +239,28 @@ public class ApplicationScenarioServiceImpl implements ApplicationScenarioServic
         } catch (Exception e) {
             log.error("根据线材类型查询应用场景失败，线材类型：{}", wireType, e);
             return BaseResponse.error("查询应用场景失败：" + e.getMessage());
+        }
+    }
+    
+    @Override
+    @Transactional
+    public BaseResponse<String> reEvaluateWireMaterials(String scenarioCode) {
+        try {
+            // 验证应用场景是否存在
+            if (!applicationScenarioRepository.existsById(scenarioCode)) {
+                return BaseResponse.error("应用场景不存在：" + scenarioCode);
+            }
+            
+            // 重新评估该场景下的所有线材数据
+            int evaluatedCount = ruleEngineService.reEvaluateByScenario(scenarioCode);
+            
+            String message = String.format("应用场景 %s 下的线材数据重新评估完成，共处理 %d 条数据", scenarioCode, evaluatedCount);
+            log.info(message);
+            
+            return BaseResponse.success(message);
+        } catch (Exception e) {
+            log.error("重新评估应用场景下的线材数据失败，场景编号：{}", scenarioCode, e);
+            return BaseResponse.error("重新评估失败：" + e.getMessage());
         }
     }
 } 

@@ -147,4 +147,28 @@ public class ApplicationScenarioController {
         BaseResponse<Void> response = applicationScenarioService.deleteScenario(scenarioCode);
         return ResponseEntity.ok(response);
     }
+    
+    /**
+     * 手动重新评估指定应用场景下的所有线材数据
+     * 权限：仅管理员用户（roleId=1）
+     */
+    @PostMapping("/{scenarioCode}/re-evaluate")
+    public ResponseEntity<BaseResponse<String>> reEvaluateWireMaterials(
+            @PathVariable @Pattern(regexp = "^\\d{2}$", message = "应用场景编号必须是两位数字") String scenarioCode,
+            HttpServletRequest httpRequest) {
+        
+        // 权限检查：仅管理员
+        Integer roleId = (Integer) httpRequest.getAttribute("roleId");
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        
+        if (roleId == null || roleId != 1) {
+            log.warn("用户{}尝试重新评估线材数据但权限不足，roleId：{}", userId, roleId);
+            return ResponseEntity.ok(BaseResponse.error("权限不足，仅管理员可重新评估线材数据"));
+        }
+        
+        log.info("管理员用户{}手动触发重新评估线材数据，场景编号：{}", userId, scenarioCode);
+        
+        BaseResponse<String> response = applicationScenarioService.reEvaluateWireMaterials(scenarioCode);
+        return ResponseEntity.ok(response);
+    }
 } 
