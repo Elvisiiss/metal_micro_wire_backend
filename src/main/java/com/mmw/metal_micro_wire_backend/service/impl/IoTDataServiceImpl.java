@@ -9,7 +9,7 @@ import com.mmw.metal_micro_wire_backend.repository.DeviceRepository;
 import com.mmw.metal_micro_wire_backend.repository.QuestionRepository;
 import com.mmw.metal_micro_wire_backend.repository.WireMaterialRepository;
 import com.mmw.metal_micro_wire_backend.service.IoTDataService;
-import com.mmw.metal_micro_wire_backend.service.RuleEngineService;
+import com.mmw.metal_micro_wire_backend.service.QualityEvaluationService;
 import com.mmw.metal_micro_wire_backend.util.EncodingUtil;
 
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ public class IoTDataServiceImpl implements IoTDataService {
     private final DeviceRepository deviceRepository;
     private final QuestionRepository questionRepository;
     private final HuaweiIotConfig huaweiIotConfig;
-    private final RuleEngineService ruleEngineService;
+    private final QualityEvaluationService qualityEvaluationService;
     
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
     
@@ -149,8 +149,8 @@ public class IoTDataServiceImpl implements IoTDataService {
                     .contactEmail(sourceInfo[4])
                     .build();
             
-            // 使用规则引擎进行评估
-            wireMaterial = ruleEngineService.evaluateWireMaterial(wireMaterial);
+            // 使用综合质量评估服务进行评估（包括规则引擎和机器学习模型）
+            wireMaterial = qualityEvaluationService.evaluateWireMaterial(wireMaterial);
             
             return saveWireMaterial(wireMaterial);
             

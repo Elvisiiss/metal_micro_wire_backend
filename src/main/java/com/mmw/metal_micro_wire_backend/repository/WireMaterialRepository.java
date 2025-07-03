@@ -17,4 +17,9 @@ public interface WireMaterialRepository extends JpaRepository<WireMaterial, Stri
      * 根据应用场景编号查找线材数据
      */
     List<WireMaterial> findByScenarioCode(String scenarioCode);
+    
+    /**
+     * 根据最终评估结果查找线材数据
+     */
+    List<WireMaterial> findByFinalEvaluationResult(WireMaterial.FinalEvaluationResult finalEvaluationResult);
 } 

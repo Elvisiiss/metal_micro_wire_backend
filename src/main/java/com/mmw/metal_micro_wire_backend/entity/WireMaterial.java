@@ -126,6 +126,31 @@ public class WireMaterial {
     private String evaluationMessage;
     
     /**
+     * 模型评估结果
+     * 机器学习模型的评估结果，用于辅助规则引擎进行更精确的质量判断
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "model_evaluation_result", length = 10)
+    @Builder.Default
+    private EvaluationResult modelEvaluationResult = EvaluationResult.UNKNOWN;
+    
+    /**
+     * 模型评估置信度
+     * 模型对评估结果的置信程度，范围0-1，值越高表示模型越确信
+     */
+    @Column(name = "model_confidence", precision = 5, scale = 4)
+    private BigDecimal modelConfidence;
+    
+    /**
+     * 最终评估结果
+     * 综合规则引擎和模型评估结果的最终质量判断，考虑人工审核需求
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "final_evaluation_result", length = 15)
+    @Builder.Default
+    private FinalEvaluationResult finalEvaluationResult = FinalEvaluationResult.UNKNOWN;
+    
+    /**
      * 创建时间
      */
     @Column(name = "create_time", nullable = false)
@@ -143,6 +168,27 @@ public class WireMaterial {
         private final String description;
         
         EvaluationResult(String description) {
+            this.description = description;
+        }
+        
+        public String getDescription() {
+            return description;
+        }
+    }
+    
+    /**
+     * 最终评估结果枚举
+     * 包含需要人工审核的状态
+     */
+    public enum FinalEvaluationResult {
+        PASS("合格"),
+        FAIL("不合格"), 
+        PENDING_REVIEW("待人工审核"),
+        UNKNOWN("未评估");
+        
+        private final String description;
+        
+        FinalEvaluationResult(String description) {
             this.description = description;
         }
         

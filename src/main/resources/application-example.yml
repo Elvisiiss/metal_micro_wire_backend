@@ -107,5 +107,26 @@ example:
     # 是否启用华为云IoT消息推送示例（启动时自动运行）
     enabled: false
 
+# 机器学习模型配置
+ml:
+  model:
+    api:
+      # 机器学习模型API服务地址
+      url: http://localhost:5000
+      # 请求超时时间（毫秒）
+      timeout: 30000
+    # 置信度阈值配置
+    confidence:
+      # 置信度阈值，低于此值需要人工审核
+      threshold: 0.8
+    # 是否启用机器学习模型评估
+    enabled: true
+    # 健康检查配置
+    health-check:
+      # 健康检查间隔（分钟）
+      interval: 5
+      # 健康检查超时时间（毫秒）
+      timeout: 5000
+
 server:
   port: 8080

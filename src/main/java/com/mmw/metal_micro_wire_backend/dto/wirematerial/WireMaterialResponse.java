@@ -99,6 +99,31 @@ public class WireMaterialResponse {
     private LocalDateTime createTime;
     
     /**
+     * 规则引擎评估结果
+     */
+    private WireMaterial.EvaluationResult evaluationResult;
+    
+    /**
+     * 评估详情
+     */
+    private String evaluationMessage;
+    
+    /**
+     * 模型评估结果
+     */
+    private WireMaterial.EvaluationResult modelEvaluationResult;
+    
+    /**
+     * 模型评估置信度
+     */
+    private BigDecimal modelConfidence;
+    
+    /**
+     * 最终评估结果
+     */
+    private WireMaterial.FinalEvaluationResult finalEvaluationResult;
+    
+    /**
      * 从实体转换为响应DTO
      */
     public static WireMaterialResponse fromEntity(WireMaterial entity) {
@@ -119,6 +144,11 @@ public class WireMaterialResponse {
                 .deviceCode(entity.getDeviceCode())
                 .eventTime(entity.getEventTime())
                 .createTime(entity.getCreateTime())
+                .evaluationResult(entity.getEvaluationResult())
+                .evaluationMessage(entity.getEvaluationMessage())
+                .modelEvaluationResult(entity.getModelEvaluationResult())
+                .modelConfidence(entity.getModelConfidence())
+                .finalEvaluationResult(entity.getFinalEvaluationResult())
                 .build();
     }
 } 
