@@ -104,6 +104,48 @@ public class EncodingUtil {
     }
     
     /**
+     * 将UTF-8字符串编码为GBK十六进制字符串
+     * 
+     * @param utf8String UTF-8字符串
+     * @return GBK编码的十六进制字符串
+     */
+    public static String encodeUtf8ToGbkHex(String utf8String) {
+        if (utf8String == null || utf8String.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            // 将UTF-8字符串转换为GBK编码的字节数组
+            byte[] gbkBytes = utf8String.getBytes(GBK);
+            
+            // 将字节数组转换为十六进制字符串
+            return bytesToHexString(gbkBytes);
+            
+        } catch (Exception e) {
+            log.error("编码UTF-8字符串为GBK十六进制失败: {}", utf8String, e);
+            return null;
+        }
+    }
+    
+    /**
+     * 将字节数组转换为十六进制字符串
+     * 
+     * @param bytes 字节数组
+     * @return 十六进制字符串
+     */
+    private static String bytesToHexString(byte[] bytes) {
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : bytes) {
+            String hex = Integer.toHexString(0xff & b);
+            if (hex.length() == 1) {
+                hexString.append('0');
+            }
+            hexString.append(hex.toUpperCase());
+        }
+        return hexString.toString();
+    }
+    
+    /**
      * 测试方法 - 验证编码转换功能
      */
     public static void main(String[] args) {
@@ -119,5 +161,14 @@ public class EncodingUtil {
         System.out.println("工艺类型: " + parsed[2]);
         System.out.println("生产机器: " + parsed[3]);
         System.out.println("联系方式: " + parsed[4]);
+        
+        // 测试编码功能
+        String testMessage = "已收到您的问题";
+        String encoded = encodeUtf8ToGbkHex(testMessage);
+        System.out.println("编码结果: " + encoded);
+        
+        // 验证编码解码是否正确
+        String decoded2 = decodeGbkHexToUtf8(encoded);
+        System.out.println("验证解码: " + decoded2);
     }
 } 

@@ -11,6 +11,7 @@ import com.mmw.metal_micro_wire_backend.repository.WireMaterialRepository;
 import com.mmw.metal_micro_wire_backend.service.IoTDataService;
 import com.mmw.metal_micro_wire_backend.service.QualityEvaluationService;
 import com.mmw.metal_micro_wire_backend.util.EncodingUtil;
+import com.mmw.metal_micro_wire_backend.util.HuaweiIotMessageUtil;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ public class IoTDataServiceImpl implements IoTDataService {
     private final QuestionRepository questionRepository;
     private final HuaweiIotConfig huaweiIotConfig;
     private final QualityEvaluationService qualityEvaluationService;
+    private final HuaweiIotMessageUtil huaweiIotMessageUtil;
     
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
     
@@ -218,17 +220,72 @@ public class IoTDataServiceImpl implements IoTDataService {
                 throw new IllegalArgumentException("未找到AI字段");
             }
             
+            // 生成AI响应内容（目前是模拟响应，后续会接入真正的大语言模型）
+            String aiResponseContent = generateAiResponse(questionContent);
+            
             Question question = Question.builder()
                     .deviceId(deviceId)
                     .eventTime(eventTime)
                     .questionContent(questionContent)
-                    .responseStatus(0) // 默认未处理
+                    .aiResponseContent(aiResponseContent)
+                    .responseStatus(1) // 设置为已处理
+                    .responseTime(LocalDateTime.now())
                     .build();
             
-            return saveQuestion(question);
+            // 保存问题
+            Question savedQuestion = saveQuestion(question);
+            
+            // 发送AI响应到设备
+            sendAiResponse(deviceId, aiResponseContent);
+            
+            return savedQuestion;
             
         } catch (Exception e) {
             throw new RuntimeException("解析并保存问题数据失败", e);
+        }
+    }
+    
+    /**
+     * 生成AI响应内容
+     * 目前是模拟响应，后续会接入真正的大语言模型
+     * 
+     * @param questionContent 问题内容
+     * @return AI响应内容
+     */
+    private String generateAiResponse(String questionContent) {
+        // TODO: 后续接入大语言模型，根据问题内容生成实际的AI响应
+        // 目前返回模拟响应
+        return "已收到您的问题：" + questionContent + "。我正在为您分析处理，请稍候。";
+    }
+    
+    /**
+     * 发送AI响应到设备
+     * 
+     * @param deviceId 设备ID
+     * @param aiResponseContent AI响应内容
+     */
+    private void sendAiResponse(String deviceId, String aiResponseContent) {
+        try {
+            // 将AI响应内容编码为GBK十六进制
+            String encodedMessage = EncodingUtil.encodeUtf8ToGbkHex(aiResponseContent);
+            
+            if (encodedMessage == null) {
+                log.error("编码AI响应内容失败: {}", aiResponseContent);
+                return;
+            }
+            
+            // 发送AI响应到设备
+            boolean success = huaweiIotMessageUtil.sendMessage(deviceId, encodedMessage, "TEXT_AI");
+            
+            if (success) {
+                log.info("AI响应发送成功: deviceId={}, response={}, encoded={}", 
+                        deviceId, aiResponseContent, encodedMessage);
+            } else {
+                log.error("AI响应发送失败: deviceId={}, response={}", deviceId, aiResponseContent);
+            }
+            
+        } catch (Exception e) {
+            log.error("发送AI响应时发生异常: deviceId={}, response={}", deviceId, aiResponseContent, e);
         }
     }
     
