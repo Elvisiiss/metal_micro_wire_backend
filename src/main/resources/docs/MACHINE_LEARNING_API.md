@@ -360,7 +360,7 @@ Authorization: Bearer {token}
 #### 3.4 人工审核确认（新增）
 **接口地址**：`POST /api/quality/confirm-result`  
 **权限要求**：管理员（roleId=1）  
-**功能说明**：人工审核确认线材的最终评估结果，支持对待审核状态和已完成状态的线材进行重新审核
+**功能说明**：人工审核确认线材的最终评估结果，支持对待审核状态和已完成状态的线材进行重新审核。系统会自动记录审核人员信息。
 
 **请求头**：
 ```
@@ -377,6 +377,11 @@ batchNumber=Cu0120250629010010001&finalResult=PASS&reviewRemark=人工确认合�
 - `batchNumber` - 批次号（必填）
 - `finalResult` - 最终结果（必填，枚举值：PASS/FAIL/PENDING_REVIEW/UNKNOWN）
 - `reviewRemark` - 审核备注（可选）
+
+**审核记录说明**：
+- 系统会自动记录审核人员的姓名和邮箱
+- 审核信息会追加到评估消息中，格式：`原始消息 | 人工审核：备注内容 [审核人：姓名(邮箱)]`
+- 支持区分"人工审核"和"人工重新审核"
 
 **成功响应**：
 ```json
@@ -524,6 +529,43 @@ ml:
 - **enabled**：设为false可禁用ML功能，仅使用规则引擎
 - **interval**：建议1-10分钟，太频繁会增加系统负载
 
+## 🔐 权限管理说明
+
+### 管理员权限设置
+
+系统中需要管理员权限的接口会自动验证用户身份：
+
+#### 权限验证机制
+- **权限要求**：普通用户中的管理员角色（roleId=1）
+- **验证位置**：在认证拦截器中设置用户信息，在控制器中验证权限
+- **权限范围**：Root用户不具有质量评估管理权限
+
+#### 管理员权限设置步骤
+1. **用户注册**：通过 `/api/auth/register` 注册普通用户
+2. **角色分配**：通过数据库直接设置用户的 `roleId = 1`
+3. **权限验证**：系统自动验证用户的 `roleId` 和 `userType`
+
+#### 权限验证逻辑
+```java
+// 只有普通用户中的管理员角色（roleId = 1）才有权限
+// Root用户不具有质量评估管理权限
+private boolean hasManagerPermission(HttpServletRequest request) {
+    TokenService.UserType userType = (TokenService.UserType) request.getAttribute("userType");
+    Integer roleId = (Integer) request.getAttribute("roleId");
+    
+    if (userType == TokenService.UserType.ROOT) {
+        return false;  // Root用户无权限
+    }
+    
+    return roleId != null && roleId == 1;  // 管理员角色
+}
+```
+
+#### 需要管理员权限的接口
+- `POST /api/quality/scenario/{scenarioCode}/re-evaluate` - 重新评估指定场景
+- `POST /api/quality/confirm-result` - 人工审核确认
+- `POST /api/wire-material/{batchNumber}/evaluate` - 手动评估线材质量
+
 ## 🔄 自动化流程详解
 
 ### 1. 人工审核使用场景
@@ -619,8 +661,12 @@ curl -X POST http://localhost:8080/api/quality/predict/batch \
 
 ### 2. 管理功能测试（需要管理员权限）
 
+**前置条件**：
+1. 创建管理员用户：注册普通用户后，在数据库中设置 `roleId = 1`
+2. 确保用户类型为普通用户，不是Root用户
+
 ```bash
-# 登录获取管理员token
+# 登录获取管理员token（需要预先设置管理员权限）
 ADMIN_TOKEN=$(curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"password"}' | jq -r '.data.token')
@@ -656,6 +702,23 @@ curl -X POST http://localhost:8080/api/quality/confirm-result \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "batchNumber=Cu0120250629010010003&finalResult=FAIL&reviewRemark=发现表面缺陷，重新判定为不合格"
+```
+
+### 3. 权限验证测试
+
+```bash
+# 测试无权限访问（应该返回权限不足错误）
+curl -X POST http://localhost:8080/api/quality/confirm-result \
+  -H "Authorization: Bearer $NORMAL_USER_TOKEN" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "batchNumber=Cu0120250629010010001&finalResult=PASS&reviewRemark=测试"
+
+# 预期响应：
+# {
+#   "msg": "权限不足，仅管理员可操作",
+#   "code": "Error",
+#   "data": null
+# }
 ```
 
 ## 🎯 系统优势与特点
@@ -780,4 +843,11 @@ curl -X POST http://localhost:8080/api/quality/confirm-result \
 - ✅ 已完成评估接口支持应用场景代码筛选
 - ✅ 已完成评估接口支持模型置信度排序（升序/降序）
 - ✅ 优化数据查询性能，避免一次性加载过多数据
-- ✅ 提供灵活的排序选项，支持按创建时间和置信度排序 
+- ✅ 提供灵活的排序选项，支持按创建时间和置信度排序
+
+**v2.0.4 更新**：
+- ✅ 为人工审核功能添加审核人员信息记录
+- ✅ 审核记录中自动记录审核人员姓名和邮箱
+- ✅ 完善权限验证机制，确保所有管理功能都需要管理员权限（roleId=1）
+- ✅ 优化审核信息格式，支持区分首次审核和重新审核
+- ✅ 增强审核记录的可追溯性 

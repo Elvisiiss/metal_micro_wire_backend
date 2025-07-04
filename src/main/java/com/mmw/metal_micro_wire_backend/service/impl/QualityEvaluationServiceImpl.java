@@ -205,7 +205,11 @@ public class QualityEvaluationServiceImpl implements QualityEvaluationService {
     @Transactional
     public boolean confirmFinalResult(String batchNumber, 
                                      WireMaterial.FinalEvaluationResult finalResult, 
-                                     String reviewRemark) {
+                                     String reviewRemark,
+                                     String reviewerName,
+                                     String reviewerEmail) {
+
+        
         try {
             WireMaterial wireMaterial = wireMaterialRepository.findById(batchNumber)
                 .orElseThrow(() -> new RuntimeException("线材不存在，批次号：" + batchNumber));
@@ -213,13 +217,16 @@ public class QualityEvaluationServiceImpl implements QualityEvaluationService {
             WireMaterial.FinalEvaluationResult originalResult = wireMaterial.getFinalEvaluationResult();
             wireMaterial.setFinalEvaluationResult(finalResult);
             
-            // 更新评估详情，添加审核备注
+            // 更新评估详情，添加审核备注和审核人员信息
             String originalMessage = wireMaterial.getEvaluationMessage();
             String reviewType = (originalResult == WireMaterial.FinalEvaluationResult.PASS || 
                                 originalResult == WireMaterial.FinalEvaluationResult.FAIL) ? 
                                 "人工重新审核" : "人工审核";
+            String reviewerInfo = (reviewerName != null && !reviewerName.isEmpty()) ? 
+                                 reviewerName + "(" + reviewerEmail + ")" : reviewerEmail;
             String updatedMessage = originalMessage + " | " + reviewType + "：" + 
-                                  (reviewRemark != null ? reviewRemark : "无备注");
+                                  (reviewRemark != null ? reviewRemark : "无备注") + 
+                                  " [审核人：" + reviewerInfo + "]";
             wireMaterial.setEvaluationMessage(updatedMessage);
             
             wireMaterialRepository.save(wireMaterial);

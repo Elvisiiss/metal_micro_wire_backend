@@ -122,7 +122,7 @@ public class WireMaterial {
     /**
      * 评估详情（记录不合格的具体指标）
      */
-    @Column(name = "evaluation_message", length = 500)
+    @Column(name = "evaluation_message", columnDefinition = "TEXT")
     private String evaluationMessage;
     
     /**

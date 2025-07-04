@@ -83,7 +83,9 @@ public interface QualityEvaluationService {
      * @param batchNumber 批次号
      * @param finalResult 最终评估结果
      * @param reviewRemark 审核备注
+     * @param reviewerName 审核人员姓名
+     * @param reviewerEmail 审核人员邮箱
      * @return 是否成功
      */
-    boolean confirmFinalResult(String batchNumber, WireMaterial.FinalEvaluationResult finalResult, String reviewRemark);
+    boolean confirmFinalResult(String batchNumber, WireMaterial.FinalEvaluationResult finalResult, String reviewRemark, String reviewerName, String reviewerEmail);
 } 
