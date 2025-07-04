@@ -6,9 +6,14 @@ import com.mmw.metal_micro_wire_backend.dto.ml.BatchPredictionResponse;
 import com.mmw.metal_micro_wire_backend.dto.ml.ModelPredictionRequest;
 import com.mmw.metal_micro_wire_backend.dto.ml.ModelPredictionResponse;
 import com.mmw.metal_micro_wire_backend.dto.ml.PredictionData;
+import com.mmw.metal_micro_wire_backend.dto.quality.CompletedEvaluationPageRequest;
+import com.mmw.metal_micro_wire_backend.dto.quality.PendingReviewPageRequest;
+import com.mmw.metal_micro_wire_backend.dto.quality.QualityEvaluationPageResponse;
 import com.mmw.metal_micro_wire_backend.entity.WireMaterial;
 import com.mmw.metal_micro_wire_backend.service.MachineLearningService;
 import com.mmw.metal_micro_wire_backend.service.QualityEvaluationService;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -84,13 +89,14 @@ public class QualityEvaluationController {
     }
     
     /**
-     * 获取需要人工审核的线材列表
+     * 获取需要人工处理的线材列表（分页）
+     * 包括未评估(UNKNOWN)和待人工审核(PENDING_REVIEW)状态的线材
      */
     @GetMapping("/pending-review")
-    public BaseResponse<List<WireMaterial>> getPendingReviewMaterials() {
+    public BaseResponse<QualityEvaluationPageResponse> getPendingReviewMaterials(@Valid PendingReviewPageRequest request) {
         try {
-            List<WireMaterial> materials = qualityEvaluationService.getPendingReviewMaterials();
-            return BaseResponse.success("获取待审核线材成功", materials);
+            QualityEvaluationPageResponse response = qualityEvaluationService.getPendingReviewMaterials(request);
+            return BaseResponse.success("获取待审核线材成功", response);
         } catch (Exception e) {
             log.error("获取待审核线材失败", e);
             return BaseResponse.error("获取待审核线材失败：" + e.getMessage());
@@ -98,7 +104,23 @@ public class QualityEvaluationController {
     }
     
     /**
+     * 获取已完成评估的线材列表（分页）
+     * 包括自动确定为合格(PASS)和不合格(FAIL)状态的线材，支持应用场景筛选和置信度排序
+     */
+    @GetMapping("/completed")
+    public BaseResponse<QualityEvaluationPageResponse> getCompletedMaterials(@Valid CompletedEvaluationPageRequest request) {
+        try {
+            QualityEvaluationPageResponse response = qualityEvaluationService.getCompletedMaterials(request);
+            return BaseResponse.success("获取已完成评估线材成功", response);
+        } catch (Exception e) {
+            log.error("获取已完成评估线材失败", e);
+            return BaseResponse.error("获取已完成评估线材失败：" + e.getMessage());
+        }
+    }
+    
+    /**
      * 人工审核确认最终结果
+     * 支持对待审核状态和已完成状态的线材进行重新审核
      */
     @PostMapping("/confirm-result")
     public BaseResponse<String> confirmFinalResult(

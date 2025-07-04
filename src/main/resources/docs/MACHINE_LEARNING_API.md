@@ -188,7 +188,7 @@ curl -X POST http://localhost:8080/api/quality/predict \
 #### 3.1 重新评估指定场景（新增）
 **接口地址**：`POST /api/quality/scenario/{scenarioCode}/re-evaluate`  
 **权限要求**：管理员（roleId=1）  
-**功能说明**：重新评估指定应用场景下的所有线材数据
+**功能说明**：重新评估指定应用场景下的所有线材数据（规则引擎+机器学习模型）
 
 **路径参数**：
 - `scenarioCode` - 应用场景代码（如：01, 02, 11等）
@@ -216,46 +216,151 @@ Authorization: Bearer {admin_token}
 }
 ```
 
-#### 3.2 获取待审核线材列表（新增）
+#### 3.2 获取待审核线材列表（分页）
 **接口地址**：`GET /api/quality/pending-review`  
 **权限要求**：已认证用户  
-**功能说明**：获取需要人工审核的线材列表
+**功能说明**：分页获取需要人工处理的线材列表，包括未评估(UNKNOWN)和待人工审核(PENDING_REVIEW)状态的线材
 
 **请求头**：
 ```
 Authorization: Bearer {token}
 ```
 
+**查询参数**：
+- `page`: 页码，从0开始 (默认: 0)
+- `size`: 每页大小 (默认: 10，最大: 100)
+- `sortBy`: 排序字段 (默认: createTime)
+- `sortDirection`: 排序方向 (默认: desc)
+
 **成功响应**：
 ```json
 {
   "msg": "获取待审核线材成功",
   "code": "success",
-  "data": [
-    {
-      "batchNumber": "Cu0120250629010010001",
-      "deviceId": "device001",
-      "diameter": 5.0,
-      "resistance": 58.0,
-      "extensibility": 35.0,
-      "weight": 1.5,
-      "evaluationResult": "PASS",              // 规则引擎结果
-      "evaluationMessage": "直径符合标准",
-      "modelEvaluationResult": "FAIL",         // 模型评估结果
-      "modelConfidence": 0.65,                 // 低置信度
-      "finalEvaluationResult": "PENDING_REVIEW", // 需要审核
-      "scenarioCode": "01",
-      "eventTime": "2024-01-15T10:30:00",
-      "createTime": "2024-01-15T10:35:00"
-    }
-  ]
+  "data": {
+    "wireMaterials": [
+      {
+        "batchNumber": "Cu0120250629010010001",
+        "deviceId": "device001",
+        "diameter": 5.0,
+        "resistance": 58.0,
+        "extensibility": 35.0,
+        "weight": 1.5,
+        "evaluationResult": "PASS",              // 规则引擎结果
+        "evaluationMessage": "直径符合标准",
+        "modelEvaluationResult": "FAIL",         // 模型评估结果
+        "modelConfidence": 0.65,                 // 低置信度
+        "finalEvaluationResult": "PENDING_REVIEW", // 需要审核
+        "scenarioCode": "01",
+        "eventTime": "2024-01-15T10:30:00",
+        "createTime": "2024-01-15T10:35:00"
+      },
+      {
+        "batchNumber": "Cu0120250629010010002",
+        "deviceId": "device002",
+        "diameter": 4.5,
+        "resistance": 55.0,
+        "extensibility": 30.0,
+        "weight": 1.2,
+        "evaluationResult": "UNKNOWN",           // 未进行规则引擎评估
+        "evaluationMessage": null,
+        "modelEvaluationResult": "UNKNOWN",      // 未进行模型评估
+        "modelConfidence": null,
+        "finalEvaluationResult": "UNKNOWN",      // 未评估状态
+        "scenarioCode": "01",
+        "eventTime": "2024-01-15T09:45:00",
+        "createTime": "2024-01-15T09:50:00"
+      }
+    ],
+    "currentPage": 0,
+    "pageSize": 10,
+    "totalPages": 1,
+    "totalElements": 2,
+    "first": true,
+    "last": true
+  }
 }
 ```
 
-#### 3.3 人工审核确认（新增）
+**返回数据说明**：
+- **PENDING_REVIEW**：经过初步评估但需要人工审核的线材（如规则引擎和模型结果不一致、置信度过低等）
+- **UNKNOWN**：尚未进行任何评估的线材（如刚接收到IoT数据但还未处理）
+
+#### 3.3 获取已完成评估线材列表（分页）
+**接口地址**：`GET /api/quality/completed`  
+**权限要求**：已认证用户  
+**功能说明**：分页获取已完成评估的线材列表，包括自动确定为合格(PASS)和不合格(FAIL)状态的线材，支持应用场景筛选和置信度排序
+
+**请求头**：
+```
+Authorization: Bearer {token}
+```
+
+**查询参数**：
+- `page`: 页码，从0开始 (默认: 0)
+- `size`: 每页大小 (默认: 10，最大: 100)
+- `scenarioCode`: 应用场景编号筛选 (可选，如：01, 02, 11等)
+- `sortBy`: 排序字段 (默认: createTime，支持: createTime, modelConfidence)
+- `sortDirection`: 排序方向 (默认: desc，对于置信度排序：desc=高置信度优先，asc=低置信度优先)
+
+**成功响应**：
+```json
+{
+  "msg": "获取已完成评估线材成功",
+  "code": "success",
+  "data": {
+    "wireMaterials": [
+      {
+        "batchNumber": "Cu0120250629010010003",
+        "deviceId": "device003",
+        "diameter": 5.2,
+        "resistance": 59.0,
+        "extensibility": 36.0,
+        "weight": 1.6,
+        "evaluationResult": "PASS",              // 规则引擎结果
+        "evaluationMessage": "所有指标符合标准",
+        "modelEvaluationResult": "PASS",         // 模型评估结果
+        "modelConfidence": 0.92,                 // 高置信度
+        "finalEvaluationResult": "PASS",         // 自动确定为合格
+        "scenarioCode": "01",
+        "eventTime": "2024-01-15T08:30:00",
+        "createTime": "2024-01-15T08:35:00"
+      },
+      {
+        "batchNumber": "Cu0120250629010010004",
+        "deviceId": "device004",
+        "diameter": 3.8,
+        "resistance": 45.0,
+        "extensibility": 20.0,
+        "weight": 0.8,
+        "evaluationResult": "FAIL",              // 规则引擎结果
+        "evaluationMessage": "直径不符合标准",
+        "modelEvaluationResult": "FAIL",         // 模型评估结果
+        "modelConfidence": 0.88,                 // 高置信度
+        "finalEvaluationResult": "FAIL",         // 自动确定为不合格
+        "scenarioCode": "01",
+        "eventTime": "2024-01-15T07:15:00",
+        "createTime": "2024-01-15T07:20:00"
+      }
+    ],
+    "currentPage": 0,
+    "pageSize": 10,
+    "totalPages": 5,
+    "totalElements": 48,
+    "first": true,
+    "last": false
+  }
+}
+```
+
+**返回数据说明**：
+- **PASS**：规则引擎和模型评估一致且置信度≥0.8，自动确定为合格的线材
+- **FAIL**：规则引擎和模型评估一致且置信度≥0.8，自动确定为不合格的线材
+
+#### 3.4 人工审核确认（新增）
 **接口地址**：`POST /api/quality/confirm-result`  
 **权限要求**：管理员（roleId=1）  
-**功能说明**：人工审核确认线材的最终评估结果
+**功能说明**：人工审核确认线材的最终评估结果，支持对待审核状态和已完成状态的线材进行重新审核
 
 **请求头**：
 ```
@@ -421,7 +526,22 @@ ml:
 
 ## 🔄 自动化流程详解
 
-### 1. IoT数据自动评估流程
+### 1. 人工审核使用场景
+
+#### 待审核数据（PENDING_REVIEW/UNKNOWN）
+- 规则引擎与模型评估结果不一致
+- 模型置信度低于阈值（默认0.8）
+- 模型评估失败或服务不可用
+- 新接收到的IoT数据尚未处理
+
+#### 已完成数据重新审核（PASS/FAIL）
+- 后续发现产品质量问题，需要追溯数据
+- 客户反馈与评估结果不符
+- 专家发现评估标准或模型存在问题
+- 定期抽检验证自动化评估准确性
+- 特殊批次或重要订单的二次确认
+
+### 2. IoT数据自动评估流程
 ```
 IoT设备上报 → 数据解析 → 规则引擎评估 → ML模型评估 → 智能决策 → 保存结果
      ↓              ↓            ↓            ↓           ↓         ↓
@@ -435,7 +555,7 @@ IoT设备上报 → 数据解析 → 规则引擎评估 → ML模型评估 → �
 4. **智能决策**：根据决策矩阵确定最终结果
 5. **结果保存**：完整记录所有评估过程和结果
 
-### 2. 启动时健康检查
+### 3. 启动时健康检查
 应用启动后自动执行：
 ```bash
 🔍 开始检查机器学习模型服务健康状态...
@@ -443,11 +563,30 @@ IoT设备上报 → 数据解析 → 规则引擎评估 → ML模型评估 → �
 📊 质量评估功能：规则引擎 + 机器学习模型 双重保障
 ```
 
-### 3. 定期健康监控
+### 4. 定期健康监控
 - **检查频率**：每5分钟（可配置）
 - **检查内容**：ML API服务可用性
 - **失败处理**：记录日志，但不中断服务
 - **恢复检测**：服务恢复时自动记录
+
+## 🎯 人工审核双重保障
+
+### 审核流程设计理念
+质量评估系统采用"自动化为主，人工为辅"的设计理念，提供**双重审核机制**：
+
+#### 第一重：智能筛选
+- **自动通过**：规则引擎和模型一致且置信度高的数据
+- **待审核**：存在争议或置信度低的数据
+
+#### 第二重：人工监督
+- **首次审核**：处理待审核状态的数据
+- **重新审核**：对已完成数据进行二次确认
+- **权威覆盖**：人工判断优先于自动化结果
+
+### 审核权限与追溯
+- **权限控制**：仅管理员可执行审核操作
+- **完整记录**：所有审核过程和结果变更均被记录
+- **可追溯性**：支持查看审核历史和变更原因
 
 ## 🛠️ 完整测试示例
 
@@ -494,15 +633,29 @@ curl -X POST http://localhost:8080/api/wire-material/Cu0120250629010010001/evalu
 curl -X POST http://localhost:8080/api/quality/scenario/01/re-evaluate \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 
-# 3. 获取待审核列表
-curl -X GET http://localhost:8080/api/quality/pending-review \
+# 3. 获取待审核列表（分页）
+curl -X GET "http://localhost:8080/api/quality/pending-review?page=0&size=20&sortBy=createTime&sortDirection=desc" \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 
-# 4. 人工审核确认
+# 4. 获取已完成评估列表（分页）
+curl -X GET "http://localhost:8080/api/quality/completed?page=0&size=20&scenarioCode=01&sortBy=modelConfidence&sortDirection=desc" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+
+# 5. 获取特定场景的低置信度数据（用于质量抽检）
+curl -X GET "http://localhost:8080/api/quality/completed?scenarioCode=01&sortBy=modelConfidence&sortDirection=asc&size=10" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+
+# 5. 人工审核确认（待审核数据）
 curl -X POST http://localhost:8080/api/quality/confirm-result \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "batchNumber=Cu0120250629010010001&finalResult=PASS&reviewRemark=人工确认合格"
+
+# 6. 人工重新审核（已完成数据）
+curl -X POST http://localhost:8080/api/quality/confirm-result \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "batchNumber=Cu0120250629010010003&finalResult=FAIL&reviewRemark=发现表面缺陷，重新判定为不合格"
 ```
 
 ## 🎯 系统优势与特点
@@ -520,7 +673,8 @@ curl -X POST http://localhost:8080/api/quality/confirm-result \
 ### 3. 人工智能辅助
 - **智能决策**：自动判断是否需要人工介入
 - **置信度评估**：提供模型预测的可信程度
-- **审核流程**：支持人工审核和最终确认
+- **全面审核流程**：支持待审核数据的人工确认和已完成数据的重新审核
+- **审核权威性**：人工专家判断优先，可覆盖自动化评估结果
 
 ### 4. 完整性和可追溯
 - **全程记录**：保存完整的评估过程和结果
@@ -604,8 +758,26 @@ curl -X POST http://localhost:8080/api/quality/confirm-result \
 2. POST /api/quality/predict/batch - 批量预测
 3. GET /api/quality/health - 健康检查
 4. POST /api/quality/scenario/{scenarioCode}/re-evaluate - 重新评估
-5. GET /api/quality/pending-review - 待审核列表
-6. POST /api/quality/confirm-result - 人工审核确认
-7. POST /api/wire-material/{batchNumber}/evaluate - 手动评估
+5. GET /api/quality/pending-review - 待审核列表（分页，包括未评估和待人工审核状态）
+6. GET /api/quality/completed - 已完成评估列表（分页，支持场景筛选和置信度排序）
+7. POST /api/quality/confirm-result - 人工审核确认（支持重新审核已完成数据）
+8. POST /api/wire-material/{batchNumber}/evaluate - 手动评估
 
-**兼容性**：完全向后兼容，现有API接口仅扩展响应字段，不影响现有功能 
+**兼容性**：完全向后兼容，现有API接口仅扩展响应字段，不影响现有功能
+
+**v2.0.1 更新**：
+- ✅ 优化待审核线材列表接口，现在同时返回未评估(UNKNOWN)和待人工审核(PENDING_REVIEW)状态的线材
+- ✅ 增强人工处理流程覆盖范围，确保所有需要人工干预的线材都能被识别
+
+**v2.0.2 更新**：
+- ✅ 新增获取已完成评估线材列表接口(`GET /api/quality/completed`)
+- ✅ 支持对已自动确定结果的线材进行人工重新审核
+- ✅ 优化人工审核流程，区分"首次审核"和"重新审核"
+- ✅ 增强审核记录的详细程度，记录原始结果和变更信息
+
+**v2.0.3 更新**：
+- ✅ 为待审核和已完成评估接口添加分页功能，支持大数据量场景
+- ✅ 已完成评估接口支持应用场景代码筛选
+- ✅ 已完成评估接口支持模型置信度排序（升序/降序）
+- ✅ 优化数据查询性能，避免一次性加载过多数据
+- ✅ 提供灵活的排序选项，支持按创建时间和置信度排序 

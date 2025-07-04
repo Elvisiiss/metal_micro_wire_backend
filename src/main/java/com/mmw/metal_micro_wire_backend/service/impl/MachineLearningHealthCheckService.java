@@ -28,11 +28,11 @@ public class MachineLearningHealthCheckService {
     @EventListener
     public void onApplicationReady(ApplicationReadyEvent event) {
         if (!mlModelEnabled) {
-            log.info("🔄 机器学习模型功能已禁用");
+            log.info("机器学习模型功能已禁用");
             return;
         }
         
-        log.info("🔍 开始检查机器学习模型服务健康状态...");
+        log.info("开始检查机器学习模型服务健康状态...");
         
         try {
             boolean healthy = machineLearningService.checkHealth();
@@ -44,8 +44,8 @@ public class MachineLearningHealthCheckService {
                 log.warn("质量评估功能：仅使用规则引擎评估");
             }
         } catch (Exception e) {
-            log.error("❌ 机器学习模型服务检查失败", e);
-            log.warn("🔄 质量评估功能：仅使用规则引擎评估");
+            log.error("机器学习模型服务检查失败", e);
+            log.warn("质量评估功能：仅使用规则引擎评估");
         }
     }
     

@@ -110,7 +110,7 @@ public class WireMaterialController {
     }
     
     /**
-     * 手动评估线材质量
+     * 手动评估线材质量（规则引擎+机器学习模型）
      * 权限：管理员（roleId=1）
      */
     @PostMapping("/{batchNumber}/evaluate")

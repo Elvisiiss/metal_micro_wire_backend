@@ -15,8 +15,23 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import com.mmw.metal_micro_wire_backend.dto.quality.CompletedEvaluationPageRequest;
+import com.mmw.metal_micro_wire_backend.dto.quality.PendingReviewPageRequest;
+import com.mmw.metal_micro_wire_backend.dto.quality.QualityEvaluationPageResponse;
+import com.mmw.metal_micro_wire_backend.dto.wirematerial.WireMaterialResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.util.StringUtils;
+
+import jakarta.persistence.criteria.Predicate;
+import java.util.ArrayList;
 
 /**
  * 质量评估服务实现类
@@ -113,8 +128,77 @@ public class QualityEvaluationServiceImpl implements QualityEvaluationService {
     
     @Override
     public List<WireMaterial> getPendingReviewMaterials() {
-        return wireMaterialRepository.findByFinalEvaluationResult(
-            WireMaterial.FinalEvaluationResult.PENDING_REVIEW);
+        // 返回未评估和待人工审核的线材
+        List<WireMaterial.FinalEvaluationResult> pendingStates = Arrays.asList(
+            WireMaterial.FinalEvaluationResult.UNKNOWN,
+            WireMaterial.FinalEvaluationResult.PENDING_REVIEW
+        );
+        return wireMaterialRepository.findByFinalEvaluationResultIn(pendingStates);
+    }
+    
+    @Override
+    public List<WireMaterial> getCompletedMaterials() {
+        // 返回已完成评估的线材（合格和不合格），供人工重新审核
+        List<WireMaterial.FinalEvaluationResult> completedStates = Arrays.asList(
+            WireMaterial.FinalEvaluationResult.PASS,
+            WireMaterial.FinalEvaluationResult.FAIL
+        );
+        return wireMaterialRepository.findByFinalEvaluationResultIn(completedStates);
+    }
+    
+    @Override
+    public QualityEvaluationPageResponse getPendingReviewMaterials(PendingReviewPageRequest request) {
+        // 构建排序
+        Sort.Direction direction = "desc".equalsIgnoreCase(request.getSortDirection()) 
+            ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort sort = Sort.by(direction, request.getSortBy());
+        Pageable pageable = PageRequest.of(request.getPage(), request.getSize(), sort);
+        
+        // 查询待审核状态的线材
+        List<WireMaterial.FinalEvaluationResult> pendingStates = Arrays.asList(
+            WireMaterial.FinalEvaluationResult.UNKNOWN,
+            WireMaterial.FinalEvaluationResult.PENDING_REVIEW
+        );
+        
+        Page<WireMaterial> wireMaterialPage = wireMaterialRepository.findByFinalEvaluationResultIn(pendingStates, pageable);
+        
+        // 转换为响应DTO
+        Page<WireMaterialResponse> responsePage = wireMaterialPage.map(WireMaterialResponse::fromEntity);
+        return QualityEvaluationPageResponse.fromPage(responsePage);
+    }
+    
+    @Override
+    public QualityEvaluationPageResponse getCompletedMaterials(CompletedEvaluationPageRequest request) {
+        // 构建排序
+        Sort.Direction direction = "desc".equalsIgnoreCase(request.getSortDirection()) 
+            ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort sort = Sort.by(direction, request.getSortBy());
+        Pageable pageable = PageRequest.of(request.getPage(), request.getSize(), sort);
+        
+        // 构建查询条件
+        Specification<WireMaterial> spec = (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            // 已完成评估状态筛选
+            List<WireMaterial.FinalEvaluationResult> completedStates = Arrays.asList(
+                WireMaterial.FinalEvaluationResult.PASS,
+                WireMaterial.FinalEvaluationResult.FAIL
+            );
+            predicates.add(root.get("finalEvaluationResult").in(completedStates));
+            
+            // 应用场景编号筛选（可选）
+            if (StringUtils.hasText(request.getScenarioCode())) {
+                predicates.add(criteriaBuilder.equal(root.get("scenarioCode"), request.getScenarioCode()));
+            }
+            
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+        
+        Page<WireMaterial> wireMaterialPage = wireMaterialRepository.findAll(spec, pageable);
+        
+        // 转换为响应DTO
+        Page<WireMaterialResponse> responsePage = wireMaterialPage.map(WireMaterialResponse::fromEntity);
+        return QualityEvaluationPageResponse.fromPage(responsePage);
     }
     
     @Override
@@ -126,17 +210,22 @@ public class QualityEvaluationServiceImpl implements QualityEvaluationService {
             WireMaterial wireMaterial = wireMaterialRepository.findById(batchNumber)
                 .orElseThrow(() -> new RuntimeException("线材不存在，批次号：" + batchNumber));
             
+            WireMaterial.FinalEvaluationResult originalResult = wireMaterial.getFinalEvaluationResult();
             wireMaterial.setFinalEvaluationResult(finalResult);
             
             // 更新评估详情，添加审核备注
             String originalMessage = wireMaterial.getEvaluationMessage();
-            String updatedMessage = originalMessage + " | 人工审核：" + reviewRemark;
+            String reviewType = (originalResult == WireMaterial.FinalEvaluationResult.PASS || 
+                                originalResult == WireMaterial.FinalEvaluationResult.FAIL) ? 
+                                "人工重新审核" : "人工审核";
+            String updatedMessage = originalMessage + " | " + reviewType + "：" + 
+                                  (reviewRemark != null ? reviewRemark : "无备注");
             wireMaterial.setEvaluationMessage(updatedMessage);
             
             wireMaterialRepository.save(wireMaterial);
             
-            log.info("人工审核确认完成，批次号：{}，最终结果：{}", 
-                batchNumber, finalResult.getDescription());
+            log.info("{}完成，批次号：{}，原结果：{}，新结果：{}", 
+                reviewType, batchNumber, originalResult.getDescription(), finalResult.getDescription());
             
             return true;
         } catch (Exception e) {

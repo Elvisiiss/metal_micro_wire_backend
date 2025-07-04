@@ -149,7 +149,7 @@ public class ApplicationScenarioController {
     }
     
     /**
-     * 手动重新评估指定应用场景下的所有线材数据
+     * 手动重新评估指定应用场景下的所有线材数据（规则引擎）
      * 权限：仅管理员用户（roleId=1）
      */
     @PostMapping("/{scenarioCode}/re-evaluate")

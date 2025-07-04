@@ -1,8 +1,10 @@
 package com.mmw.metal_micro_wire_backend.controller;
 
 import com.mmw.metal_micro_wire_backend.dto.BaseResponse;
+import com.mmw.metal_micro_wire_backend.service.MachineLearningService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +29,12 @@ public class HealthController {
     
     @Autowired
     private StringRedisTemplate redisTemplate;
+    
+    @Autowired
+    private MachineLearningService machineLearningService;
+    
+    @Value("${ml.model.enabled:true}")
+    private boolean mlModelEnabled;
     
     /**
      * 健康检查接口
@@ -56,6 +64,22 @@ public class HealthController {
             }
         } catch (Exception e) {
             status.put("redis", "disconnected: " + e.getMessage());
+        }
+        
+        // 检查机器学习模型服务状态
+        if (mlModelEnabled) {
+            try {
+                boolean healthy = machineLearningService.checkHealth();
+                if (healthy) {
+                    status.put("ml_model", "connected");
+                } else {
+                    status.put("ml_model", "disconnected");
+                }
+            } catch (Exception e) {
+                status.put("ml_model", "error: " + e.getMessage());
+            }
+        } else {
+            status.put("ml_model", "disabled");
         }
         
         status.put("service", "running");

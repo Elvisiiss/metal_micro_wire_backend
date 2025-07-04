@@ -251,7 +251,7 @@ public class ApplicationScenarioServiceImpl implements ApplicationScenarioServic
                 return BaseResponse.error("应用场景不存在：" + scenarioCode);
             }
             
-            // 重新评估该场景下的所有线材数据
+            // 重新评估该场景下的所有线材数据（规则引擎）
             int evaluatedCount = ruleEngineService.reEvaluateByScenario(scenarioCode);
             
             String message = String.format("应用场景 %s 下的线材数据重新评估完成，共处理 %d 条数据", scenarioCode, evaluatedCount);
