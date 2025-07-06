@@ -143,9 +143,8 @@ app:
 
     # 管理员邮箱列表（接收汇总报告和严重问题通知）
     admin-emails:
-      - quality.manager@company.com
-      - production.director@company.com
-      - system.admin@company.com
+      - 3106133216@qq.com
+      - 3115089759@qq.com
 
     # 邮件发送配置
     email-retry-count: 3        # 邮件发送重试次数
@@ -158,10 +157,17 @@ app:
     # 定时任务执行频率（cron表达式）
     # 格式：秒 分 时 日 月 周
     # 示例：
+    # "0 0 0 * * ?"     - 每天凌晨执行一次（推荐）
     # "0 0 * * * ?"     - 每小时执行一次
     # "0 */30 * * * ?"  - 每30分钟执行一次
     # "0 0 */2 * * ?"   - 每2小时执行一次
-    cron: "0 0 * * * ?"
+    cron: "0 0 0 * * ?"
+    # 检测时间窗口（小时）- 检测前N小时的数据
+    detection-window-hours: 24
+    # 是否向管理员发送无问题确认邮件
+    send-no-issue-notification-to-admin: true
+    # 质量问题判定阈值（百分比）
+    fail-rate-threshold: 5.0
 
   # 质量报告生成配置
   quality-report:
