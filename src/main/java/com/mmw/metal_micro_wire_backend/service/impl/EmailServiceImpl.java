@@ -184,4 +184,44 @@ public class EmailServiceImpl implements EmailService {
         Random random = new Random();
         return String.format("%06d", random.nextInt(1000000));
     }
-} 
+
+    @Override
+    public void sendSimpleEmail(String to, String subject, String content) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(content, false); // false表示纯文本格式
+
+            mailSender.send(message);
+            log.info("简单邮件发送成功，收件人：{}，主题：{}", to, subject);
+
+        } catch (Exception e) {
+            log.error("简单邮件发送失败，收件人：{}，主题：{}，错误：{}", to, subject, e.getMessage());
+            throw new RuntimeException("邮件发送失败", e);
+        }
+    }
+
+    @Override
+    public void sendHtmlEmail(String to, String subject, String htmlContent) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true); // true表示HTML格式
+
+            mailSender.send(message);
+            log.info("HTML邮件发送成功，收件人：{}，主题：{}", to, subject);
+
+        } catch (Exception e) {
+            log.error("HTML邮件发送失败，收件人：{}，主题：{}，错误：{}", to, subject, e.getMessage());
+            throw new RuntimeException("邮件发送失败", e);
+        }
+    }
+}
