@@ -1,6 +1,7 @@
 package com.mmw.metal_micro_wire_backend.service.impl;
 
 import com.mmw.metal_micro_wire_backend.config.NotificationConfig;
+import com.mmw.metal_micro_wire_backend.config.QualityMonitorConfig;
 import com.mmw.metal_micro_wire_backend.dto.BaseResponse;
 import com.mmw.metal_micro_wire_backend.dto.traceability.*;
 import com.mmw.metal_micro_wire_backend.entity.WireMaterial;
@@ -30,6 +31,7 @@ public class TraceabilityServiceImpl implements TraceabilityService {
     private final WireMaterialRepository wireMaterialRepository;
     private final EmailService emailService;
     private final NotificationConfig notificationConfig;
+    private final QualityMonitorConfig qualityMonitorConfig;
     
     // 支持多种日期时间格式
     private static final DateTimeFormatter ISO_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
@@ -598,63 +600,206 @@ public class TraceabilityServiceImpl implements TraceabilityService {
         }
     }
 
+    // ==================== 纯统计分析方法（不涉及邮件） ====================
+
+    @Override
+    public BaseResponse<List<QualityIssueResponse>> analyzeAllQualityIssues() {
+        log.info("开始全量历史数据质量统计分析");
+
+        List<QualityIssueResponse> allIssues = new ArrayList<>();
+
+        // 全量统计各维度（无时间限制）
+        allIssues.addAll(analyzeQualityIssuesByDimension(TraceabilityQueryRequest.QueryDimension.MANUFACTURER, null, null));
+        allIssues.addAll(analyzeQualityIssuesByDimension(TraceabilityQueryRequest.QueryDimension.RESPONSIBLE_PERSON, null, null));
+        allIssues.addAll(analyzeQualityIssuesByDimension(TraceabilityQueryRequest.QueryDimension.PROCESS_TYPE, null, null));
+        allIssues.addAll(analyzeQualityIssuesByDimension(TraceabilityQueryRequest.QueryDimension.PRODUCTION_MACHINE, null, null));
+
+        log.info("全量历史数据质量统计分析完成，发现{}个质量问题", allIssues.size());
+        return BaseResponse.success(allIssues);
+    }
+
+    @Override
+    public BaseResponse<List<QualityIssueResponse>> analyzeQualityIssuesByTimeWindow(
+            LocalDateTime startTime, LocalDateTime endTime) {
+        log.info("开始时间窗口质量统计分析，时间范围：{} 至 {}", startTime, endTime);
+
+        List<QualityIssueResponse> allIssues = new ArrayList<>();
+
+        // 基于时间窗口统计各维度
+        allIssues.addAll(analyzeQualityIssuesByDimension(TraceabilityQueryRequest.QueryDimension.MANUFACTURER, startTime, endTime));
+        allIssues.addAll(analyzeQualityIssuesByDimension(TraceabilityQueryRequest.QueryDimension.RESPONSIBLE_PERSON, startTime, endTime));
+        allIssues.addAll(analyzeQualityIssuesByDimension(TraceabilityQueryRequest.QueryDimension.PROCESS_TYPE, startTime, endTime));
+        allIssues.addAll(analyzeQualityIssuesByDimension(TraceabilityQueryRequest.QueryDimension.PRODUCTION_MACHINE, startTime, endTime));
+
+        log.info("时间窗口质量统计分析完成，发现{}个质量问题", allIssues.size());
+        return BaseResponse.success(allIssues);
+    }
+
+    /**
+     * 核心统计分析方法（纯数据处理，不涉及通知）
+     */
+    private List<QualityIssueResponse> analyzeQualityIssuesByDimension(
+            TraceabilityQueryRequest.QueryDimension dimension, LocalDateTime startTime, LocalDateTime endTime) {
+
+        TraceabilityQueryRequest request = TraceabilityQueryRequest.builder()
+                .dimension(dimension)
+                .startTime(startTime)
+                .endTime(endTime)
+                .onlyProblematic(true)
+                .failRateThreshold(qualityMonitorConfig.getFailRateThreshold())
+                .build();
+
+        List<QualityStatisticsResponse> statistics = getStatisticsByDimension(request);
+        return identifyIssuesFromStatistics(statistics, request);
+    }
+
+    // ==================== 自动检测+通知方法（基于时间窗口） ====================
+
     @Override
     public BaseResponse<String> autoDetectAndNotifyQualityIssues() {
+        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime startTime = endTime.minusHours(qualityMonitorConfig.getDetectionWindowHours());
+
+        return autoDetectAndNotifyQualityIssues(startTime, endTime);
+    }
+
+    @Override
+    public BaseResponse<String> autoDetectAndNotifyQualityIssues(
+            LocalDateTime startTime, LocalDateTime endTime) {
         try {
-            log.info("开始自动检测质量问题");
+            log.info("开始基于时间窗口的质量问题自动检测，时间范围：{} 至 {}", startTime, endTime);
 
-            // 检测各个维度的质量问题
-            List<QualityIssueResponse> allIssues = new ArrayList<>();
+            // 1. 调用纯统计分析方法
+            BaseResponse<List<QualityIssueResponse>> analysisResult =
+                analyzeQualityIssuesByTimeWindow(startTime, endTime);
 
-            // 检测生产商问题
-            TraceabilityQueryRequest manufacturerRequest = TraceabilityQueryRequest.builder()
-                    .dimension(TraceabilityQueryRequest.QueryDimension.MANUFACTURER)
-                    .onlyProblematic(true)
-                    .failRateThreshold(5.0)
-                    .build();
-            allIssues.addAll(identifyIssuesFromStatistics(getStatisticsByDimension(manufacturerRequest), manufacturerRequest));
-
-            // 检测负责人问题
-            TraceabilityQueryRequest personRequest = TraceabilityQueryRequest.builder()
-                    .dimension(TraceabilityQueryRequest.QueryDimension.RESPONSIBLE_PERSON)
-                    .onlyProblematic(true)
-                    .failRateThreshold(5.0)
-                    .build();
-            allIssues.addAll(identifyIssuesFromStatistics(getStatisticsByDimension(personRequest), personRequest));
-
-            // 检测工艺问题
-            TraceabilityQueryRequest processRequest = TraceabilityQueryRequest.builder()
-                    .dimension(TraceabilityQueryRequest.QueryDimension.PROCESS_TYPE)
-                    .onlyProblematic(true)
-                    .failRateThreshold(5.0)
-                    .build();
-            allIssues.addAll(identifyIssuesFromStatistics(getStatisticsByDimension(processRequest), processRequest));
-
-            // 检测机器问题
-            TraceabilityQueryRequest machineRequest = TraceabilityQueryRequest.builder()
-                    .dimension(TraceabilityQueryRequest.QueryDimension.PRODUCTION_MACHINE)
-                    .onlyProblematic(true)
-                    .failRateThreshold(5.0)
-                    .build();
-            allIssues.addAll(identifyIssuesFromStatistics(getStatisticsByDimension(machineRequest), machineRequest));
-
-            if (allIssues.isEmpty()) {
-                log.info("未检测到质量问题");
-                return BaseResponse.success("未检测到质量问题");
+            if (!"success".equals(analysisResult.getCode())) {
+                return BaseResponse.error("质量问题分析失败：" + analysisResult.getMsg());
             }
 
-            // 发送通知
-            BaseResponse<String> notificationResult = sendQualityIssueNotifications(allIssues);
+            List<QualityIssueResponse> qualityIssues = analysisResult.getData();
 
-            String result = String.format("自动检测完成，发现%d个质量问题，%s",
-                    allIssues.size(), notificationResult.getData());
-            log.info(result);
+            // 2. 根据分析结果决定通知策略
+            if (qualityIssues.isEmpty()) {
+                // 无质量问题：仅向管理员发送确认邮件
+                return sendNoIssuesNotificationToAdmin(startTime, endTime);
+            } else {
+                // 有质量问题：向相关人员发送问题通知
+                BaseResponse<String> notificationResult = sendQualityIssueNotifications(qualityIssues);
 
-            return BaseResponse.success(result);
+                String result = String.format("增量检测完成，时间窗口：%s 至 %s，发现%d个质量问题，%s",
+                        startTime.format(STANDARD_DATE_TIME_FORMATTER),
+                        endTime.format(STANDARD_DATE_TIME_FORMATTER),
+                        qualityIssues.size(),
+                        notificationResult.getData());
+                log.info(result);
+
+                return BaseResponse.success(result);
+            }
 
         } catch (Exception e) {
-            log.error("自动检测质量问题失败", e);
-            return BaseResponse.error("自动检测质量问题失败：" + e.getMessage());
+            log.error("基于时间窗口的质量问题自动检测失败", e);
+            return BaseResponse.error("质量问题自动检测失败：" + e.getMessage());
+        }
+    }
+
+    // ==================== 独立的邮件发送方法 ====================
+
+    @Override
+    public BaseResponse<String> sendCustomNotification(CustomNotificationRequest request) {
+        try {
+            log.info("开始发送自定义邮件通知，收件人：{}", request.getRecipients());
+
+            int successCount = 0;
+            int totalCount = request.getRecipients().size();
+
+            for (String recipient : request.getRecipients()) {
+                try {
+                    if (Boolean.TRUE.equals(request.getIsHtml())) {
+                        emailService.sendHtmlEmail(recipient, request.getSubject(), request.getContent());
+                    } else {
+                        emailService.sendSimpleEmail(recipient, request.getSubject(), request.getContent());
+                    }
+                    successCount++;
+                    log.info("自定义邮件发送成功，收件人：{}", recipient);
+                } catch (Exception e) {
+                    log.error("自定义邮件发送失败，收件人：{}，错误：{}", recipient, e.getMessage());
+                }
+            }
+
+            String result = String.format("自定义邮件发送完成，成功：%d/%d，收件人：%s",
+                successCount, totalCount, String.join(", ", request.getRecipients()));
+            log.info(result);
+
+            if (successCount == totalCount) {
+                return BaseResponse.success(result);
+            } else if (successCount > 0) {
+                return BaseResponse.success(result + "（部分成功）");
+            } else {
+                return BaseResponse.error("所有邮件发送失败");
+            }
+
+        } catch (Exception e) {
+            log.error("自定义邮件发送异常", e);
+            return BaseResponse.error("自定义邮件发送异常：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 无质量问题时向管理员发送确认邮件
+     */
+    private BaseResponse<String> sendNoIssuesNotificationToAdmin(
+            LocalDateTime startTime, LocalDateTime endTime) {
+        try {
+            if (!qualityMonitorConfig.isSendNoIssueNotificationToAdmin()) {
+                String result = String.format("时间窗口 %s 至 %s 内未检测到质量问题",
+                    startTime.format(STANDARD_DATE_TIME_FORMATTER),
+                    endTime.format(STANDARD_DATE_TIME_FORMATTER));
+                log.info(result);
+                return BaseResponse.success(result);
+            }
+
+            String subject = String.format("质量监控系统运行确认 - %s",
+                endTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+
+            String content = String.format(
+                "质量监控系统运行正常。\n\n" +
+                "检测时间范围：%s 至 %s\n" +
+                "检测结果：未发现质量问题\n" +
+                "系统状态：正常运行\n\n" +
+                "此邮件仅发送给管理员，用于确认系统正常工作。",
+                startTime.format(STANDARD_DATE_TIME_FORMATTER),
+                endTime.format(STANDARD_DATE_TIME_FORMATTER)
+            );
+
+            // 仅发送给管理员邮箱
+            String[] adminEmails = notificationConfig.getAdminEmails();
+            int successCount = 0;
+
+            for (String adminEmail : adminEmails) {
+                try {
+                    emailService.sendSimpleEmail(adminEmail, subject, content);
+                    successCount++;
+                    log.info("管理员确认邮件发送成功，收件人：{}", adminEmail);
+                } catch (Exception e) {
+                    log.error("管理员确认邮件发送失败，收件人：{}，错误：{}", adminEmail, e.getMessage());
+                }
+            }
+
+            if (successCount > 0) {
+                String result = String.format("时间窗口 %s 至 %s 内未检测到质量问题，已向%d个管理员发送确认邮件",
+                    startTime.format(STANDARD_DATE_TIME_FORMATTER),
+                    endTime.format(STANDARD_DATE_TIME_FORMATTER),
+                    successCount);
+                log.info(result);
+                return BaseResponse.success(result);
+            } else {
+                return BaseResponse.error("管理员确认邮件发送失败");
+            }
+
+        } catch (Exception e) {
+            log.error("发送管理员确认邮件失败", e);
+            return BaseResponse.error("发送管理员确认邮件失败：" + e.getMessage());
         }
     }
 

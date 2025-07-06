@@ -3,6 +3,7 @@ package com.mmw.metal_micro_wire_backend.service;
 import com.mmw.metal_micro_wire_backend.dto.BaseResponse;
 import com.mmw.metal_micro_wire_backend.dto.traceability.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -86,9 +87,38 @@ public interface TraceabilityService {
     BaseResponse<List<QualityStatisticsResponse>> getProductionMachineAnalysis(String startTime, String endTime, String scenarioCode);
     
     /**
-     * 自动检测并通知质量问题
+     * 自动检测并通知质量问题（使用默认时间窗口）
      * 定时任务调用，自动检测质量问题并发送通知
      * @return 检测和通知结果
      */
     BaseResponse<String> autoDetectAndNotifyQualityIssues();
+
+    /**
+     * 自动检测并通知质量问题（指定时间窗口）
+     * @param startTime 检测开始时间
+     * @param endTime 检测结束时间
+     * @return 检测和通知结果
+     */
+    BaseResponse<String> autoDetectAndNotifyQualityIssues(LocalDateTime startTime, LocalDateTime endTime);
+
+    /**
+     * 全量历史数据质量统计分析（仅用于报表展示，不发送邮件）
+     * @return 质量问题列表
+     */
+    BaseResponse<List<QualityIssueResponse>> analyzeAllQualityIssues();
+
+    /**
+     * 基于时间窗口的质量统计分析（仅用于数据分析，不发送邮件）
+     * @param startTime 分析开始时间
+     * @param endTime 分析结束时间
+     * @return 质量问题列表
+     */
+    BaseResponse<List<QualityIssueResponse>> analyzeQualityIssuesByTimeWindow(LocalDateTime startTime, LocalDateTime endTime);
+
+    /**
+     * 发送自定义邮件通知（完全独立的邮件功能）
+     * @param request 自定义邮件请求
+     * @return 邮件发送结果
+     */
+    BaseResponse<String> sendCustomNotification(CustomNotificationRequest request);
 }

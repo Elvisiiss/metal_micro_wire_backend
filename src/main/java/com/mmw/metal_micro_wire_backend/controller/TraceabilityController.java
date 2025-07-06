@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.util.List;
 
 /**
@@ -225,25 +226,119 @@ public class TraceabilityController {
         }
     }
     
+    // ==================== 统计分析接口（不发送邮件） ====================
+
     /**
-     * 自动检测并通知质量问题
+     * 全量历史数据质量统计分析
+     * 仅用于报表展示，不发送邮件通知
+     */
+    @PostMapping("/analyze/all")
+    public BaseResponse<List<QualityIssueResponse>> analyzeAllQualityIssues(HttpServletRequest httpRequest) {
+        try {
+            String userName = (String) httpRequest.getAttribute("userName");
+            log.info("执行全量历史数据质量统计分析，用户：{}", userName);
+
+            return traceabilityService.analyzeAllQualityIssues();
+
+        } catch (Exception e) {
+            log.error("全量历史数据质量统计分析接口异常", e);
+            return BaseResponse.error("全量历史数据质量统计分析失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 基于时间窗口的质量统计分析
+     * 仅用于数据分析，不发送邮件通知
+     */
+    @PostMapping("/analyze/time-window")
+    public BaseResponse<List<QualityIssueResponse>> analyzeQualityIssuesByTimeWindow(
+            @RequestBody @Valid TraceabilityQueryRequest request,
+            HttpServletRequest httpRequest) {
+        try {
+            String userName = (String) httpRequest.getAttribute("userName");
+            log.info("执行时间窗口质量统计分析，用户：{}，时间范围：{} 至 {}",
+                userName, request.getStartTime(), request.getEndTime());
+
+            if (request.getStartTime() == null || request.getEndTime() == null) {
+                return BaseResponse.error("开始时间和结束时间不能为空");
+            }
+
+            return traceabilityService.analyzeQualityIssuesByTimeWindow(
+                request.getStartTime(), request.getEndTime());
+
+        } catch (Exception e) {
+            log.error("时间窗口质量统计分析接口异常", e);
+            return BaseResponse.error("时间窗口质量统计分析失败：" + e.getMessage());
+        }
+    }
+
+    // ==================== 自动检测+通知接口 ====================
+
+    /**
+     * 自动检测并通知质量问题（使用默认时间窗口）
      * 管理员功能，用于定时任务或手动触发
      */
     @PostMapping("/auto-detect")
     public BaseResponse<String> autoDetectAndNotifyQualityIssues(HttpServletRequest httpRequest) {
-
         try {
-            // 从拦截器设置的属性中获取用户信息（拦截器已验证token）
             String userName = (String) httpRequest.getAttribute("userName");
             Long userId = (Long) httpRequest.getAttribute("userId");
 
-            log.info("手动触发自动检测质量问题，用户：{}(ID:{})", userName, userId);
+            log.info("手动触发自动检测质量问题（默认时间窗口），用户：{}(ID:{})", userName, userId);
 
             return traceabilityService.autoDetectAndNotifyQualityIssues();
 
         } catch (Exception e) {
             log.error("自动检测质量问题接口异常", e);
             return BaseResponse.error("自动检测质量问题失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 自动检测并通知质量问题（指定时间窗口）
+     * 管理员功能，支持自定义时间范围
+     */
+    @PostMapping("/auto-detect/time-window")
+    public BaseResponse<String> autoDetectAndNotifyQualityIssuesWithTimeWindow(
+            @RequestBody @Valid TraceabilityQueryRequest request,
+            HttpServletRequest httpRequest) {
+        try {
+            String userName = (String) httpRequest.getAttribute("userName");
+            log.info("手动触发自动检测质量问题（指定时间窗口），用户：{}，时间范围：{} 至 {}",
+                userName, request.getStartTime(), request.getEndTime());
+
+            if (request.getStartTime() == null || request.getEndTime() == null) {
+                return BaseResponse.error("开始时间和结束时间不能为空");
+            }
+
+            return traceabilityService.autoDetectAndNotifyQualityIssues(
+                request.getStartTime(), request.getEndTime());
+
+        } catch (Exception e) {
+            log.error("指定时间窗口自动检测质量问题接口异常", e);
+            return BaseResponse.error("指定时间窗口自动检测质量问题失败：" + e.getMessage());
+        }
+    }
+
+    // ==================== 独立邮件发送接口 ====================
+
+    /**
+     * 发送自定义邮件通知
+     * 完全独立的邮件发送功能
+     */
+    @PostMapping("/notifications/send-custom")
+    public BaseResponse<String> sendCustomNotification(
+            @RequestBody @Valid CustomNotificationRequest request,
+            HttpServletRequest httpRequest) {
+        try {
+            String userName = (String) httpRequest.getAttribute("userName");
+            log.info("发送自定义邮件通知，用户：{}，收件人：{}", userName, request.getRecipients());
+
+            return traceabilityService.sendCustomNotification(request);
+
+        } catch (Exception e) {
+            log.error("发送自定义邮件通知接口异常", e);
+            return BaseResponse.error("发送自定义邮件通知失败：" + e.getMessage());
         }
     }
 }

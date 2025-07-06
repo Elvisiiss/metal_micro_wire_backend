@@ -28,22 +28,23 @@ public class QualityMonitorTask {
     private final EmailService emailService;
     
     /**
-     * 每小时检测一次质量问题
-     * 可通过配置文件调整频率
+     * 基于时间窗口的质量问题检测任务
+     * 默认每天凌晨执行，检测前24小时的数据
      */
-    @Scheduled(cron = "${app.quality-monitor.cron:0 0 * * * ?}")
+    @Scheduled(cron = "${app.quality-monitor.cron:0 0 0 * * ?}")
     public void autoDetectQualityIssues() {
-        log.info("开始执行定时质量问题检测任务");
-        
+        log.info("开始执行基于时间窗口的定时质量问题检测任务");
+
         try {
+            // 使用新的时间窗口检测方法（默认24小时窗口）
             BaseResponse<String> result = traceabilityService.autoDetectAndNotifyQualityIssues();
-            
+
             if ("success".equals(result.getCode())) {
                 log.info("定时质量问题检测任务完成：{}", result.getData());
             } else {
                 log.error("定时质量问题检测任务失败：{}", result.getMsg());
             }
-            
+
         } catch (Exception e) {
             log.error("定时质量问题检测任务异常", e);
         }

@@ -4,6 +4,8 @@
 
 质量溯源系统提供多维度的质量问题分析和追踪功能，支持生产商、负责人、工艺类型、生产机器四个维度的质量统计和问题识别。
 
+**重要更新**：系统已完成质量监控定时任务重构，实现了统计分析与邮件通知的完全解耦，支持时间窗口增量检测。
+
 ## 基础信息
 
 - **基础URL**: `/api/traceability`
@@ -20,6 +22,28 @@
 }
 ```
 
+## 架构设计说明
+
+### 1. 统计分析与通知解耦
+
+系统将质量统计分析和邮件通知功能完全分离：
+
+- **纯统计分析接口**：仅进行数据分析，不发送邮件，用于报表展示和数据查询
+- **自动检测+通知接口**：结合统计分析和邮件发送，用于定时任务和问题通知
+- **独立邮件发送接口**：完全独立的邮件功能，支持自定义内容
+
+### 2. 时间窗口增量检测
+
+- 摒弃全量历史数据扫描，采用时间窗口增量检测
+- 默认检测前24小时数据，避免重复通知已解决问题
+- 支持自定义时间范围，提供灵活的检测策略
+
+### 3. 智能通知策略
+
+- **有质量问题**：向相关责任人发送问题通知邮件
+- **无质量问题**：仅向管理员发送系统运行确认邮件
+- 支持完全自定义的邮件发送功能
+
 **字段说明**：
 - `code`: 响应状态码，成功时为"success"，失败时为"Error"
 - `msg`: 响应消息，描述操作结果
@@ -27,7 +51,131 @@
 
 ## API 接口列表
 
-### 1. 执行溯源分析
+## 新增接口（重构后）
+
+### 1. 全量历史数据质量统计分析
+
+**接口描述**: 分析所有历史数据的质量问题，仅用于报表展示，不发送邮件通知
+
+**请求方式**: `POST /api/traceability/analyze/all`
+
+**请求参数**: 无
+
+**响应示例**:
+```json
+{
+  "code": "success",
+  "msg": "操作成功",
+  "data": [
+    {
+      "issueId": "MANUFACTURER_华为技术有限公司_1704067200000",
+      "dimension": "生产商",
+      "dimensionValue": "华为技术有限公司",
+      "severity": "MEDIUM",
+      "failRate": 8.0,
+      "failCount": 8,
+      "totalCount": 100,
+      "description": "生产商华为技术有限公司的不合格率为8.00%，超过阈值5.00%",
+      "recommendation": "建议检查生产工艺和质量控制流程",
+      "contactEmail": "quality@huawei.com",
+      "discoveredTime": "2025-01-01T12:00:00",
+      "notified": false
+    }
+  ]
+}
+```
+
+### 2. 基于时间窗口的质量统计分析
+
+**接口描述**: 分析指定时间范围内的质量问题，仅用于数据分析，不发送邮件通知
+
+**请求方式**: `POST /api/traceability/analyze/time-window`
+
+**请求参数**:
+```json
+{
+  "startTime": "2024-12-01T00:00:00",
+  "endTime": "2024-12-31T23:59:59"
+}
+```
+
+**参数说明**:
+- `startTime`: 分析开始时间，必填
+- `endTime`: 分析结束时间，必填
+
+**响应示例**: 同上
+
+### 3. 自动检测并通知质量问题（默认时间窗口）
+
+**接口描述**: 使用默认时间窗口（24小时）检测质量问题并发送通知
+
+**请求方式**: `POST /api/traceability/auto-detect`
+
+**请求参数**: 无
+
+**响应示例**:
+```json
+{
+  "code": "success",
+  "msg": "操作成功",
+  "data": "增量检测完成，时间窗口：2024-12-30 00:00:00 至 2024-12-31 00:00:00，发现2个质量问题，邮件通知发送成功"
+}
+```
+
+### 4. 自动检测并通知质量问题（指定时间窗口）
+
+**接口描述**: 在指定时间范围内检测质量问题并发送通知
+
+**请求方式**: `POST /api/traceability/auto-detect/time-window`
+
+**请求参数**:
+```json
+{
+  "startTime": "2024-12-01T00:00:00",
+  "endTime": "2024-12-31T23:59:59"
+}
+```
+
+**响应示例**: 同上
+
+### 5. 发送自定义邮件通知
+
+**接口描述**: 发送自定义内容的邮件通知，完全独立的邮件发送功能
+
+**请求方式**: `POST /api/traceability/notifications/send-custom`
+
+**请求参数**:
+```json
+{
+  "recipients": ["user1@example.com", "user2@example.com"],
+  "subject": "质量问题通知",
+  "content": "发现质量问题，请及时处理...",
+  "emailType": "QUALITY_ISSUE",
+  "isHtml": false,
+  "additionalData": "{\"issueCount\": 3}"
+}
+```
+
+**参数说明**:
+- `recipients`: 收件人邮箱列表，必填
+- `subject`: 邮件主题，必填
+- `content`: 邮件正文内容，必填
+- `emailType`: 邮件类型，可选
+- `isHtml`: 是否为HTML格式邮件，默认false
+- `additionalData`: 附加数据（JSON格式），可选
+
+**响应示例**:
+```json
+{
+  "code": "success",
+  "msg": "操作成功",
+  "data": "自定义邮件发送完成，成功：2/2，收件人：user1@example.com, user2@example.com"
+}
+```
+
+## 原有接口
+
+### 6. 执行溯源分析
 
 **接口描述**: 根据指定维度执行全面的质量溯源分析
 
@@ -1451,3 +1599,173 @@ default List<WireMaterial> getFailedBatchesByDimension(String dimension, String 
 - API接口兼容性验证
 
 这些修复确保了质量溯源系统的稳定性和可靠性，为生产环境的部署奠定了坚实基础。
+
+## 10. 质量监控配置说明
+
+### 10.1 配置文件
+
+在 `application.yml` 中添加以下配置：
+
+```yaml
+app:
+  quality-monitor:
+    # 是否启用质量监控定时任务
+    enabled: true
+    # 定时任务执行频率（cron表达式）
+    # 格式：秒 分 时 日 月 周
+    # 示例：
+    # "0 0 0 * * ?"     - 每天凌晨执行一次（推荐）
+    # "0 0 * * * ?"     - 每小时执行一次
+    # "0 */30 * * * ?"  - 每30分钟执行一次
+    # "0 0 */2 * * ?"   - 每2小时执行一次
+    cron: "0 0 0 * * ?"
+    # 检测时间窗口（小时）- 检测前N小时的数据
+    detection-window-hours: 24
+    # 是否向管理员发送无问题确认邮件
+    send-no-issue-notification-to-admin: true
+    # 质量问题判定阈值（百分比）
+    fail-rate-threshold: 5.0
+```
+
+### 10.2 配置参数说明
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enabled` | boolean | true | 是否启用质量监控定时任务 |
+| `cron` | string | "0 0 0 * * ?" | 定时任务执行频率（cron表达式） |
+| `detection-window-hours` | int | 24 | 检测时间窗口（小时） |
+| `send-no-issue-notification-to-admin` | boolean | true | 是否向管理员发送无问题确认邮件 |
+| `fail-rate-threshold` | double | 5.0 | 质量问题判定阈值（百分比） |
+
+### 10.3 时间窗口说明
+
+- **增量检测**：系统采用时间窗口增量检测，避免重复通知已解决的问题
+- **默认窗口**：检测前24小时的数据，可通过配置调整
+- **灵活配置**：支持通过API接口指定自定义时间范围
+
+### 10.4 通知策略
+
+#### 10.4.1 有质量问题时
+- 向相关责任人发送问题通知邮件
+- 邮件包含问题详情、严重程度、建议措施等信息
+- 支持多个收件人同时通知
+
+#### 10.4.2 无质量问题时
+- 仅向管理员发送系统运行确认邮件
+- 确认系统正常工作，避免误报
+- 可通过配置关闭此功能
+
+### 10.5 Vue3前端集成示例
+
+#### 10.5.1 全量统计分析
+
+```javascript
+// 获取全量历史数据质量统计
+async function analyzeAllQualityIssues() {
+  try {
+    const response = await axios.post('/api/traceability/analyze/all', {}, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (response.data.code === 'success') {
+      // 处理统计结果
+      const issues = response.data.data;
+      console.log('发现质量问题：', issues.length);
+
+      // 可以用于图表展示
+      renderQualityChart(issues);
+    }
+  } catch (error) {
+    console.error('统计分析失败：', error);
+  }
+}
+```
+
+#### 10.5.2 时间窗口分析
+
+```javascript
+// 基于时间窗口的质量统计分析
+async function analyzeQualityByTimeWindow(startTime, endTime) {
+  try {
+    const response = await axios.post('/api/traceability/analyze/time-window', {
+      startTime: startTime,
+      endTime: endTime
+    }, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    return response.data.data;
+  } catch (error) {
+    console.error('时间窗口分析失败：', error);
+    throw error;
+  }
+}
+```
+
+#### 10.5.3 自动检测触发
+
+```javascript
+// 手动触发质量问题检测
+async function triggerQualityDetection() {
+  try {
+    const response = await axios.post('/api/traceability/auto-detect', {}, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (response.data.code === 'success') {
+      // 显示检测结果
+      showNotification('检测完成', response.data.data, 'success');
+    }
+  } catch (error) {
+    showNotification('检测失败', error.message, 'error');
+  }
+}
+```
+
+#### 10.5.4 自定义邮件发送
+
+```javascript
+// 发送自定义邮件通知
+async function sendCustomNotification(recipients, subject, content) {
+  try {
+    const response = await axios.post('/api/traceability/notifications/send-custom', {
+      recipients: recipients,
+      subject: subject,
+      content: content,
+      isHtml: false
+    }, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('邮件发送失败：', error);
+    throw error;
+  }
+}
+```
+
+### 10.6 数据可视化建议
+
+#### 10.6.1 质量趋势图表
+- 使用ECharts或Chart.js展示质量问题趋势
+- 按时间维度显示不合格率变化
+- 支持多维度对比分析
+
+#### 10.6.2 问题分布图
+- 饼图显示各维度问题分布
+- 柱状图对比不同责任人/机器的质量表现
+- 热力图展示问题集中区域
+
+#### 10.6.3 实时监控面板
+- 实时显示当前质量状态
+- 最近检测结果和通知状态
+- 系统运行状态指示器
