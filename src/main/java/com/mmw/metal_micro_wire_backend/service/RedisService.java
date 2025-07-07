@@ -83,4 +83,74 @@ public interface RedisService {
      * @return 值，如果不存在返回null
      */
     String get(String key);
+    
+    // ==================== 聊天会话管理 ====================
+    
+    /**
+     * 保存聊天会话
+     * @param userId 用户ID
+     * @param sessionId 会话ID
+     * @param sessionData 会话数据JSON
+     * @param expireHours 过期时间（小时）
+     */
+    void saveChatSession(Long userId, String sessionId, String sessionData, int expireHours);
+    
+    /**
+     * 获取聊天会话
+     * @param userId 用户ID
+     * @param sessionId 会话ID
+     * @return 会话数据JSON
+     */
+    String getChatSession(Long userId, String sessionId);
+    
+    /**
+     * 删除聊天会话
+     * @param userId 用户ID
+     * @param sessionId 会话ID
+     */
+    void deleteChatSession(Long userId, String sessionId);
+    
+    /**
+     * 获取用户的所有会话ID
+     * @param userId 用户ID
+     * @return 会话ID列表
+     */
+    java.util.Set<String> getUserChatSessions(Long userId);
+    
+    /**
+     * 保存聊天消息历史
+     * @param userId 用户ID
+     * @param sessionId 会话ID
+     * @param messageHistory 消息历史JSON
+     * @param expireHours 过期时间（小时）
+     */
+    void saveChatMessageHistory(Long userId, String sessionId, String messageHistory, int expireHours);
+    
+    /**
+     * 获取聊天消息历史
+     * @param userId 用户ID
+     * @param sessionId 会话ID
+     * @return 消息历史JSON
+     */
+    String getChatMessageHistory(Long userId, String sessionId);
+    
+    /**
+     * 删除聊天消息历史
+     * @param userId 用户ID
+     * @param sessionId 会话ID
+     */
+    void deleteChatMessageHistory(Long userId, String sessionId);
+    
+    /**
+     * 获取用户会话数量
+     * @param userId 用户ID
+     * @return 会话数量
+     */
+    int getUserChatSessionCount(Long userId);
+    
+    /**
+     * 清理用户过期会话
+     * @param userId 用户ID
+     */
+    void cleanupExpiredChatSessions(Long userId);
 } 

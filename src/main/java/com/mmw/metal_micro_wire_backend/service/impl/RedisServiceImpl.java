@@ -24,6 +24,12 @@ public class RedisServiceImpl implements RedisService {
     private static final String CODE_PREFIX = "verification_code:";
     // 验证码发送冷却前缀
     private static final String CODE_COOLDOWN_PREFIX = "code_cooldown:";
+    // 聊天会话前缀
+    private static final String CHAT_SESSION_PREFIX = "chat_session:";
+    // 聊天消息历史前缀
+    private static final String CHAT_MESSAGE_HISTORY_PREFIX = "chat_message_history:";
+    // 用户会话列表前缀
+    private static final String USER_SESSIONS_PREFIX = "user_sessions:";
     
     @Override
     public void saveVerificationCode(String email, String code, String type) {
@@ -110,5 +116,105 @@ public class RedisServiceImpl implements RedisService {
     @Override
     public String get(String key) {
         return redisTemplate.opsForValue().get(key);
+    }
+    
+    // ==================== 聊天会话管理实现 ====================
+    
+    @Override
+    public void saveChatSession(Long userId, String sessionId, String sessionData, int expireHours) {
+        String sessionKey = CHAT_SESSION_PREFIX + userId + ":" + sessionId;
+        String userSessionsKey = USER_SESSIONS_PREFIX + userId;
+        
+        // 保存会话数据
+        redisTemplate.opsForValue().set(sessionKey, sessionData, expireHours, TimeUnit.HOURS);
+        
+        // 添加会话ID到用户会话列表
+        redisTemplate.opsForSet().add(userSessionsKey, sessionId);
+        redisTemplate.expire(userSessionsKey, expireHours, TimeUnit.HOURS);
+        
+        log.debug("聊天会话已保存，用户ID：{}，会话ID：{}，过期时间：{}小时", userId, sessionId, expireHours);
+    }
+    
+    @Override
+    public String getChatSession(Long userId, String sessionId) {
+        String sessionKey = CHAT_SESSION_PREFIX + userId + ":" + sessionId;
+        return redisTemplate.opsForValue().get(sessionKey);
+    }
+    
+    @Override
+    public void deleteChatSession(Long userId, String sessionId) {
+        String sessionKey = CHAT_SESSION_PREFIX + userId + ":" + sessionId;
+        String userSessionsKey = USER_SESSIONS_PREFIX + userId;
+        String messageHistoryKey = CHAT_MESSAGE_HISTORY_PREFIX + userId + ":" + sessionId;
+        
+        // 删除会话数据
+        redisTemplate.delete(sessionKey);
+        
+        // 从用户会话列表中删除
+        redisTemplate.opsForSet().remove(userSessionsKey, sessionId);
+        
+        // 删除消息历史
+        redisTemplate.delete(messageHistoryKey);
+        
+        log.debug("聊天会话已删除，用户ID：{}，会话ID：{}", userId, sessionId);
+    }
+    
+    @Override
+    public java.util.Set<String> getUserChatSessions(Long userId) {
+        String userSessionsKey = USER_SESSIONS_PREFIX + userId;
+        return redisTemplate.opsForSet().members(userSessionsKey);
+    }
+    
+    @Override
+    public void saveChatMessageHistory(Long userId, String sessionId, String messageHistory, int expireHours) {
+        String messageHistoryKey = CHAT_MESSAGE_HISTORY_PREFIX + userId + ":" + sessionId;
+        redisTemplate.opsForValue().set(messageHistoryKey, messageHistory, expireHours, TimeUnit.HOURS);
+        
+        log.debug("聊天消息历史已保存，用户ID：{}，会话ID：{}，过期时间：{}小时", userId, sessionId, expireHours);
+    }
+    
+    @Override
+    public String getChatMessageHistory(Long userId, String sessionId) {
+        String messageHistoryKey = CHAT_MESSAGE_HISTORY_PREFIX + userId + ":" + sessionId;
+        return redisTemplate.opsForValue().get(messageHistoryKey);
+    }
+    
+    @Override
+    public void deleteChatMessageHistory(Long userId, String sessionId) {
+        String messageHistoryKey = CHAT_MESSAGE_HISTORY_PREFIX + userId + ":" + sessionId;
+        redisTemplate.delete(messageHistoryKey);
+        
+        log.debug("聊天消息历史已删除，用户ID：{}，会话ID：{}", userId, sessionId);
+    }
+    
+    @Override
+    public int getUserChatSessionCount(Long userId) {
+        String userSessionsKey = USER_SESSIONS_PREFIX + userId;
+        Long count = redisTemplate.opsForSet().size(userSessionsKey);
+        return count != null ? count.intValue() : 0;
+    }
+    
+    @Override
+    public void cleanupExpiredChatSessions(Long userId) {
+        String userSessionsKey = USER_SESSIONS_PREFIX + userId;
+        java.util.Set<String> sessionIds = redisTemplate.opsForSet().members(userSessionsKey);
+        
+        if (sessionIds != null && !sessionIds.isEmpty()) {
+            for (String sessionId : sessionIds) {
+                String sessionKey = CHAT_SESSION_PREFIX + userId + ":" + sessionId;
+                
+                // 检查会话是否过期
+                if (!redisTemplate.hasKey(sessionKey)) {
+                    // 会话已过期，从用户会话列表中删除
+                    redisTemplate.opsForSet().remove(userSessionsKey, sessionId);
+                    
+                    // 删除对应的消息历史
+                    String messageHistoryKey = CHAT_MESSAGE_HISTORY_PREFIX + userId + ":" + sessionId;
+                    redisTemplate.delete(messageHistoryKey);
+                    
+                    log.debug("清理过期会话，用户ID：{}，会话ID：{}", userId, sessionId);
+                }
+            }
+        }
     }
 } 

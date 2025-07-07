@@ -199,3 +199,40 @@ app:
 
 server:
   port: 8080
+
+# DeepSeek大语言模型配置
+deepseek:
+  # API配置
+  api:
+    # API基础URL
+    base-url: https://api.deepseek.com
+    # API密钥 - 请替换为您的实际API密钥
+    api-key: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    # 连接超时时间（秒）
+    connect-timeout: 30
+    # 读取超时时间（秒）
+    read-timeout: 60
+    # 是否启用DeepSeek服务
+    enabled: true
+  
+  # 模型配置
+  model:
+    # 默认模型名称
+    default-model: deepseek-chat
+    # 最大tokens数
+    max-tokens: 4096
+    # 温度参数（0.0-1.0）
+    temperature: 0.7
+    # 系统提示词
+    system-prompt: "你是一个智能助手，请用中文回答用户的问题。"
+  
+  # 会话配置
+  session:
+    # 会话过期时间（小时）
+    expire-hours: 24
+    # 每个用户最大会话数
+    max-sessions-per-user: 10
+    # 每个会话最大消息数
+    max-messages-per-session: 100
+    # 会话标题最大长度
+    max-title-length: 50
