@@ -31,7 +31,7 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/auth/login/**", 
                         "/api/auth/reset-password/**",
                         "/api/auth/root/**",
-                        "/api/auth/token",
+                        // "/api/auth/token",
                         // 注意：/api/auth/user/data 和 /api/auth/logout 需要认证，所以不排除
                         
                         // 静态资源
