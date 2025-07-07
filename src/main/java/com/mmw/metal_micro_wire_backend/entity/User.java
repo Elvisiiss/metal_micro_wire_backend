@@ -54,7 +54,13 @@ public class User {
     @Column(nullable = false)
     @Builder.Default
     private Integer status = 0;
-    
+
+    /**
+     * 头像URL
+     */
+    @Column(length = 500)
+    private String avatarUrl;
+
     /**
      * 创建时间
      */

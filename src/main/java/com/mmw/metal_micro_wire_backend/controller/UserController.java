@@ -1,13 +1,19 @@
 package com.mmw.metal_micro_wire_backend.controller;
 
 import com.mmw.metal_micro_wire_backend.dto.BaseResponse;
+import com.mmw.metal_micro_wire_backend.dto.user.AvatarUploadResponse;
+import com.mmw.metal_micro_wire_backend.dto.user.UpdateUsernameRequest;
+import com.mmw.metal_micro_wire_backend.dto.user.UserProfileResponse;
+import com.mmw.metal_micro_wire_backend.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.HashMap;
-import java.util.Map;
+
 
 /**
  * 用户控制器
@@ -16,42 +22,60 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/api/user")
+@RequiredArgsConstructor
 public class UserController {
+
+    private final UserService userService;
     
     /**
-     * 获取当前用户信息
+     * 获取当前用户详细信息
      * 这个接口需要token认证
      */
     @GetMapping("/profile")
-    public ResponseEntity<BaseResponse<Map<String, Object>>> getUserProfile(HttpServletRequest request) {
+    public ResponseEntity<BaseResponse<UserProfileResponse>> getUserProfile(HttpServletRequest request) {
         // 从拦截器设置的属性中获取用户信息
         Long userId = (Long) request.getAttribute("userId");
-        String email = (String) request.getAttribute("email");
-        String userName = (String) request.getAttribute("userName");
-        Integer roleId = (Integer) request.getAttribute("roleId");
-        
-        Map<String, Object> userInfo = new HashMap<>();
-        userInfo.put("userId", userId);
-        userInfo.put("email", email);
-        userInfo.put("userName", userName);
-        userInfo.put("roleId", roleId);
-        
-        log.info("获取用户信息成功，用户ID：{}，邮箱：{}", userId, email);
-        return ResponseEntity.ok(BaseResponse.success("获取用户信息成功", userInfo));
+
+        BaseResponse<UserProfileResponse> response = userService.getUserProfile(userId);
+        return ResponseEntity.ok(response);
     }
     
     /**
-     * 更新用户信息
+     * 上传用户头像
      * 这个接口需要token认证
      */
-    @PostMapping("/update")
-    public ResponseEntity<BaseResponse<Void>> updateUser(HttpServletRequest request) {
-        // 从拦截器设置的属性中获取用户信息
+    @PostMapping("/avatar/upload")
+    public ResponseEntity<BaseResponse<AvatarUploadResponse>> uploadAvatar(
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest request) {
+
         Long userId = (Long) request.getAttribute("userId");
-        String email = (String) request.getAttribute("email");
-        
-        // 暂未实现更新逻辑
-        log.info("更新用户信息，用户ID：{}，邮箱：{}", userId, email);
-        return ResponseEntity.ok(BaseResponse.success("用户信息更新成功"));
+        BaseResponse<AvatarUploadResponse> response = userService.uploadAvatar(userId, file);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 删除用户头像
+     * 这个接口需要token认证
+     */
+    @DeleteMapping("/avatar")
+    public ResponseEntity<BaseResponse<Void>> deleteAvatar(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        BaseResponse<Void> response = userService.deleteAvatar(userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 修改用户名
+     * 这个接口需要token认证，用户只能修改自己的用户名
+     */
+    @PutMapping("/username")
+    public ResponseEntity<BaseResponse<Void>> updateUsername(
+            @Valid @RequestBody UpdateUsernameRequest request,
+            HttpServletRequest httpRequest) {
+
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        BaseResponse<Void> response = userService.updateUsername(userId, request);
+        return ResponseEntity.ok(response);
     }
 } 

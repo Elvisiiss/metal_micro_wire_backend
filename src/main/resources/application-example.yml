@@ -5,6 +5,14 @@ spring:
   application:
     name: metal_micro_wire_backend
 
+  # Spring Boot文件上传配置
+  servlet:
+    multipart:
+      # 最大文件大小
+      max-file-size: 2MB
+      # 最大请求大小
+      max-request-size: 2MB
+
   # 数据库配置
   # datasource:
   #   url: jdbc:mysql://localhost:3306/metal_micro_wire?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8
@@ -128,8 +136,17 @@ ml:
       # 健康检查超时时间（毫秒）
       timeout: 5000
 
-# 质量溯源系统配置
 app:
+  # 文件上传配置
+  file-upload:
+    # 文件上传根目录
+    upload-path: uploads
+    # 头像上传子目录
+    avatar-path: avatars
+    # 最大文件大小（字节）- 2MB
+    max-file-size: 2097152
+    # 文件访问URL前缀
+    url-prefix: /api/files
   # 通知配置
   notification:
     # 是否启用邮件通知

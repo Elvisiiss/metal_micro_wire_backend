@@ -302,7 +302,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 
 ### 5. 用户信息接口（需要认证）
 
-#### 5.1 获取当前用户信息
+#### 5.1 获取当前用户信息（已被修改，更改查看用户信息管理API文档）
 - **接口**: `GET /api/user/profile`
 - **认证**: ✅ 需要Token认证
 - **请求头示例**:
@@ -323,7 +323,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 }
 ```
 
-#### 5.2 更新用户信息
+#### 5.2 更新用户信息（已被删除，更改查看用户信息管理API文档）
 - **接口**: `POST /api/user/update`
 - **认证**: ✅ 需要Token认证
 - **请求头示例**:

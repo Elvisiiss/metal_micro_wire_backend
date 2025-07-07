@@ -39,6 +39,8 @@ public class WebConfig implements WebMvcConfigurer {
                         "/css/**",
                         "/js/**",
                         "/images/**",
+                        // 文件访问接口
+                        "/api/files/**",
                         // Swagger相关
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
