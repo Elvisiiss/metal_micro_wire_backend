@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mmw.metal_micro_wire_backend.config.DeepSeekConfig;
 import com.mmw.metal_micro_wire_backend.dto.chat.*;
 import com.mmw.metal_micro_wire_backend.service.ChatService;
+import com.mmw.metal_micro_wire_backend.service.ChatToolService;
 import com.mmw.metal_micro_wire_backend.service.RedisService;
 import com.mmw.metal_micro_wire_backend.service.TokenService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class ChatServiceImpl implements ChatService {
     private final RedisService redisService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final ChatToolService chatToolService;
     
     @Override
     public ChatMessageResponse sendMessage(Long userId, TokenService.UserType userType, ChatMessageRequest request) {
@@ -55,7 +57,7 @@ public class ChatServiceImpl implements ChatService {
             List<ChatMessage> messageHistory = getMessageHistory(userId, sessionId);
             
             // 构建API请求
-            String response = callDeepSeekApi(messageHistory, request.getMessage());
+            String response = callDeepSeekApi(messageHistory, request.getMessage(), userId);
             
             // 保存消息
             saveMessage(userId, sessionId, request.getMessage(), response, messageHistory);
@@ -261,12 +263,12 @@ public class ChatServiceImpl implements ChatService {
     
     // ==================== 私有方法 ====================
     
-    private String callDeepSeekApi(List<ChatMessage> messageHistory, String newMessage) throws Exception {
+    private String callDeepSeekApi(List<ChatMessage> messageHistory, String newMessage, Long userId) throws Exception {
         // 构建消息列表
         List<Map<String, String>> messages = new ArrayList<>();
         
         // 添加系统消息
-        messages.add(Map.of("role", "system", "content", deepSeekConfig.getModel().getSystemPrompt()));
+        messages.add(Map.of("role", "system", "content", buildSystemPrompt()));
         
         // 添加历史消息
         for (ChatMessage msg : messageHistory) {
@@ -282,6 +284,13 @@ public class ChatServiceImpl implements ChatService {
         requestBody.put("messages", messages);
         requestBody.put("temperature", deepSeekConfig.getModel().getTemperature());
         requestBody.put("max_tokens", deepSeekConfig.getModel().getMaxTokens());
+        
+        // 添加工具调用支持
+        List<ChatToolCall.Tool> tools = chatToolService.getAvailableTools();
+        if (!tools.isEmpty()) {
+            requestBody.put("tools", tools);
+            requestBody.put("tool_choice", "auto");
+        }
         
         // 构建请求头
         HttpHeaders headers = new HttpHeaders();
@@ -302,6 +311,13 @@ public class ChatServiceImpl implements ChatService {
             JsonNode firstChoice = choices.get(0);
             JsonNode message = firstChoice.get("message");
             if (message != null) {
+                // 检查是否有工具调用
+                JsonNode toolCalls = message.get("tool_calls");
+                if (toolCalls != null && toolCalls.isArray() && toolCalls.size() > 0) {
+                    return handleToolCalls(toolCalls, messageHistory, newMessage, userId);
+                }
+                
+                // 普通文本响应
                 JsonNode content = message.get("content");
                 if (content != null) {
                     return content.asText();
@@ -395,6 +411,152 @@ public class ChatServiceImpl implements ChatService {
         // 保存消息历史
         String historyData = objectMapper.writeValueAsString(messageHistory);
         redisService.saveChatMessageHistory(userId, sessionId, historyData, deepSeekConfig.getSession().getExpireHours());
+    }
+    
+    /**
+     * 构建系统提示词
+     */
+    private String buildSystemPrompt() {
+        return """
+            你是金属微细线材综合检测平台的智能助手，专门为用户提供线材检测、质量分析和设备管理相关的服务。
+            
+            ## 你的能力
+            1. **设备管理**：查询设备状态、设备列表等信息
+            2. **线材检测数据**：查询金属微丝的检测数据、质量参数等
+            3. **质量分析**：进行质量问题溯源分析、生产商排名、质量统计等
+            4. **数据统计**：提供系统总体统计、年度统计、场景统计等数据分析
+            
+            ## 工作原则
+            - 专业性：使用准确的技术术语，提供专业的分析建议
+            - 实用性：优先提供实际可行的解决方案
+            - 数据驱动：基于实际检测数据进行分析和建议
+            - 用户友好：将复杂的技术信息转化为易懂的表述
+            
+            ## 响应风格
+            - 简洁明了，重点突出
+            - 提供具体的数据和分析结果
+            - 在适当时候主动建议相关的查询或分析
+            - 对于质量问题，提供可能的原因和改进建议
+            
+            ## 注意事项
+            - 当用户询问具体数据时，优先使用工具函数获取实时数据
+            - 对于质量问题，要客观分析，避免主观臆断
+            - 保护用户隐私和商业机密
+            - 如果遇到超出能力范围的问题，诚实说明并建议联系相关技术人员
+            
+            请用中文回答用户的问题，并在需要时主动调用相关工具获取数据。
+            """;
+    }
+    
+    /**
+     * 处理工具调用
+     */
+    private String handleToolCalls(JsonNode toolCalls, List<ChatMessage> messageHistory, String newMessage, Long userId) throws Exception {
+        List<Map<String, Object>> toolMessages = new ArrayList<>();
+        
+        // 执行所有工具调用
+        for (JsonNode toolCall : toolCalls) {
+            String toolCallId = toolCall.get("id").asText();
+            String functionName = toolCall.get("function").get("name").asText();
+            String arguments = toolCall.get("function").get("arguments").asText();
+            
+            // 构建工具调用请求
+            ChatToolCall.ToolCallRequest request = new ChatToolCall.ToolCallRequest();
+            request.setId(toolCallId);
+            request.setType("function");
+            
+            ChatToolCall.FunctionCall functionCall = new ChatToolCall.FunctionCall();
+            functionCall.setName(functionName);
+            functionCall.setArguments(arguments);
+            request.setFunction(functionCall);
+            
+            // 执行工具调用
+            ChatToolCall.ToolCallResult toolResult = chatToolService.executeToolCall(request, userId);
+            
+            // 添加工具调用结果到消息
+            Map<String, Object> toolMessage = new HashMap<>();
+            toolMessage.put("role", "tool");
+            toolMessage.put("tool_call_id", toolCallId);
+            toolMessage.put("content", toolResult.getResult());
+            toolMessages.add(toolMessage);
+            
+            if (toolResult.isSuccess()) {
+                log.info("工具调用成功：{}，结果：{}", functionName, toolResult.getResult());
+            } else {
+                log.error("工具调用失败：{}，错误：{}", functionName, toolResult.getError());
+            }
+        }
+        
+        // 如果有工具调用结果，需要再次调用API获取最终响应
+        if (!toolMessages.isEmpty()) {
+            return callDeepSeekApiWithToolResults(messageHistory, newMessage, toolCalls, toolMessages);
+        }
+        
+        return "工具调用完成，但没有返回结果";
+    }
+    
+    /**
+     * 带工具调用结果的API调用
+     */
+    private String callDeepSeekApiWithToolResults(List<ChatMessage> messageHistory, String newMessage, JsonNode toolCalls, List<Map<String, Object>> toolMessages) throws Exception {
+        // 构建消息列表
+        List<Map<String, Object>> messages = new ArrayList<>();
+        
+        // 添加系统消息
+        messages.add(Map.of("role", "system", "content", buildSystemPrompt()));
+        
+        // 添加历史消息
+        for (ChatMessage msg : messageHistory) {
+            messages.add(Map.of("role", msg.getRole(), "content", msg.getContent()));
+        }
+        
+        // 添加用户消息
+        messages.add(Map.of("role", "user", "content", newMessage));
+        
+        // 添加助手消息（包含工具调用）
+        Map<String, Object> assistantMessage = new HashMap<>();
+        assistantMessage.put("role", "assistant");
+        assistantMessage.put("content", null);
+        assistantMessage.put("tool_calls", objectMapper.convertValue(toolCalls, List.class));
+        messages.add(assistantMessage);
+        
+        // 添加工具调用结果
+        messages.addAll(toolMessages);
+        
+        // 构建请求体
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", deepSeekConfig.getModel().getDefaultModel());
+        requestBody.put("messages", messages);
+        requestBody.put("temperature", deepSeekConfig.getModel().getTemperature());
+        requestBody.put("max_tokens", deepSeekConfig.getModel().getMaxTokens());
+        
+        // 构建请求头
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + deepSeekConfig.getApi().getApiKey());
+        
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
+        
+        // 发送请求
+        String url = deepSeekConfig.getApi().getBaseUrl() + "/v1/chat/completions";
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+        
+        // 解析响应
+        JsonNode responseJson = objectMapper.readTree(response.getBody());
+        JsonNode choices = responseJson.get("choices");
+        
+        if (choices != null && choices.isArray() && choices.size() > 0) {
+            JsonNode firstChoice = choices.get(0);
+            JsonNode message = firstChoice.get("message");
+            if (message != null) {
+                JsonNode content = message.get("content");
+                if (content != null) {
+                    return content.asText();
+                }
+            }
+        }
+        
+        throw new RuntimeException("DeepSeek API响应格式不正确");
     }
     
     private void updateSessionInfo(Long userId, String sessionId, ChatSession session, String lastMessage) throws JsonProcessingException {

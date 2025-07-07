@@ -33,6 +33,7 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/auth/root/**",
                         // "/api/auth/token",
                         // 注意：/api/auth/user/data 和 /api/auth/logout 需要认证，所以不排除
+                        // 注意：/api/chat/** 需要认证，所以不排除
                         
                         // 静态资源
                         "/static/**",
