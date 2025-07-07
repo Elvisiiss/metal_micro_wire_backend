@@ -46,9 +46,14 @@ public class AuthResponse {
      * 认证Token
      */
     private String token;
+
+    /**
+     * 用户头像URL
+     */
+    private String avatar_url;
     
     // 成功登录的静态方法
-    public static AuthResponse success(String msg, String email, String userName, Integer roleId, String token) {
+    public static AuthResponse success(String msg, String email, String userName, Integer roleId, String token, String avatar_url) {
         return AuthResponse.builder()
                 .msg(msg)
                 .code("success")
@@ -56,6 +61,7 @@ public class AuthResponse {
                 .user_name(userName)
                 .role_id(roleId)
                 .token(token)
+                .avatar_url(avatar_url)
                 .build();
     }
     

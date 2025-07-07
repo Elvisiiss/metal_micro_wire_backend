@@ -212,7 +212,7 @@ public class AuthServiceImpl implements AuthService {
                 user.getId(), user.getEmail(), user.getUserName(), user.getRoleId(), remember, TokenService.UserType.NORMAL);
             
             log.info("用户登录成功，邮箱：{}，用户名：{}", user.getEmail(), user.getUserName());
-            return AuthResponse.success("成功登录", user.getEmail(), user.getUserName(), user.getRoleId(), token);
+            return AuthResponse.success("成功登录", user.getEmail(), user.getUserName(), user.getRoleId(), token, user.getAvatarUrl());
             
         } catch (Exception e) {
             log.error("登录失败，账号：{}，错误：{}", account, e.getMessage());
@@ -289,7 +289,7 @@ public class AuthServiceImpl implements AuthService {
                 user.getId(), user.getEmail(), user.getUserName(), user.getRoleId(), remember, TokenService.UserType.NORMAL);
             
             log.info("用户验证码登录成功，邮箱：{}，用户名：{}", user.getEmail(), user.getUserName());
-            return AuthResponse.success("成功登录", user.getEmail(), user.getUserName(), user.getRoleId(), token);
+            return AuthResponse.success("成功登录", user.getEmail(), user.getUserName(), user.getRoleId(), token, user.getAvatarUrl());
             
         } catch (Exception e) {
             log.error("验证码登录失败，邮箱：{}，错误：{}", email, e.getMessage());
@@ -344,7 +344,7 @@ public class AuthServiceImpl implements AuthService {
                 root.getId(), "root@system", root.getUserName(), 999, remember, TokenService.UserType.ROOT);
             
             log.info("Root用户登录成功，用户名：{}", root.getUserName());
-            return AuthResponse.success("Root登录成功", "root@system", root.getUserName(), 999, token);
+            return AuthResponse.success("Root登录成功", "root@system", root.getUserName(), 999, token, null);
             
         } catch (Exception e) {
             log.error("Root登录失败，用户名：{}，错误：{}", userName, e.getMessage());
