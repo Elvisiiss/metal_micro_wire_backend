@@ -309,4 +309,71 @@ public interface WireMaterialRepository extends JpaRepository<WireMaterial, Stri
     List<Object[]> getOverallStatistics(@Param("startTime") LocalDateTime startTime,
                                        @Param("endTime") LocalDateTime endTime,
                                        @Param("scenarioCode") String scenarioCode);
+
+    // ==================== 仪表板统计查询方法 ====================
+
+    /**
+     * 获取最近12个月的月度统计数据
+     */
+    @Query(value = "SELECT " +
+           "YEAR(w.event_time) as year, " +
+           "MONTH(w.event_time) as month, " +
+           "SUM(CASE WHEN w.final_evaluation_result = 'PASS' THEN 1 ELSE 0 END) as passCount, " +
+           "SUM(CASE WHEN w.final_evaluation_result = 'FAIL' THEN 1 ELSE 0 END) as failCount, " +
+           "COUNT(w.batch_number) as totalCount " +
+           "FROM wire_materials w " +
+           "WHERE w.event_time >= ?1 " +
+           "GROUP BY YEAR(w.event_time), MONTH(w.event_time) " +
+           "ORDER BY YEAR(w.event_time), MONTH(w.event_time)", nativeQuery = true)
+    List<Object[]> getMonthlyStatistics(@Param("startDate") LocalDateTime startDate);
+
+    /**
+     * 根据时间范围统计应用场景使用次数
+     */
+    @Query(value = "SELECT " +
+           "w.scenario_code, " +
+           "COUNT(w.batch_number) as scenarioCount " +
+           "FROM wire_materials w " +
+           "WHERE w.event_time >= COALESCE(?1, '1900-01-01'::timestamp) " +
+           "AND w.event_time <= COALESCE(?2, '2100-12-31'::timestamp) " +
+           "GROUP BY w.scenario_code " +
+           "ORDER BY scenarioCount DESC", nativeQuery = true)
+    List<Object[]> getScenarioStatistics(@Param("startTime") LocalDateTime startTime,
+                                        @Param("endTime") LocalDateTime endTime);
+
+    /**
+     * 获取系统总体统计数据
+     */
+    @Query(value = "SELECT " +
+           "COUNT(w.batch_number) as totalDetectionCount, " +
+           "SUM(CASE WHEN w.final_evaluation_result = 'PASS' THEN 1 ELSE 0 END) as totalPassCount, " +
+           "SUM(CASE WHEN w.final_evaluation_result = 'FAIL' THEN 1 ELSE 0 END) as totalFailCount " +
+           "FROM wire_materials w", nativeQuery = true)
+    List<Object[]> getOverallSystemStatistics();
+
+    /**
+     * 获取本月统计数据
+     */
+    @Query(value = "SELECT " +
+           "COUNT(w.batch_number) as currentMonthCount, " +
+           "SUM(CASE WHEN w.final_evaluation_result = 'PASS' THEN 1 ELSE 0 END) as currentMonthPassCount, " +
+           "SUM(CASE WHEN w.final_evaluation_result = 'FAIL' THEN 1 ELSE 0 END) as currentMonthFailCount " +
+           "FROM wire_materials w " +
+           "WHERE YEAR(w.event_time) = ?1 AND MONTH(w.event_time) = ?2", nativeQuery = true)
+    List<Object[]> getCurrentMonthStatistics(@Param("year") Integer year, @Param("month") Integer month);
+
+    /**
+     * 获取上月统计数据
+     */
+    @Query(value = "SELECT " +
+           "COUNT(w.batch_number) as lastMonthCount " +
+           "FROM wire_materials w " +
+           "WHERE YEAR(w.event_time) = ?1 AND MONTH(w.event_time) = ?2", nativeQuery = true)
+    List<Object[]> getLastMonthStatistics(@Param("year") Integer year, @Param("month") Integer month);
+
+    /**
+     * 获取不同设备的数量
+     */
+    @Query(value = "SELECT COUNT(DISTINCT w.device_id) as deviceCount FROM wire_materials w", nativeQuery = true)
+    Long getDistinctDeviceCount();
 }

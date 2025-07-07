@@ -10,6 +10,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -56,15 +58,37 @@ public class GlobalExceptionHandler {
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
-        
+
         log.warn("数据绑定失败：{}", errors);
-        
+
         BaseResponse<Map<String, String>> response = BaseResponse.<Map<String, String>>builder()
                 .msg("数据绑定失败")
                 .code("Error")
                 .data(errors)
                 .build();
-        
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * 处理参数约束验证异常
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<BaseResponse<Void>> handleConstraintViolationException(ConstraintViolationException ex) {
+        // 提取第一个约束违反的错误信息
+        String errorMessage = "参数验证失败";
+        if (!ex.getConstraintViolations().isEmpty()) {
+            ConstraintViolation<?> violation = ex.getConstraintViolations().iterator().next();
+            errorMessage = violation.getMessage();
+        }
+
+        log.warn("参数约束验证失败：{}", errorMessage);
+
+        BaseResponse<Void> response = BaseResponse.<Void>builder()
+                .msg(errorMessage)
+                .code("Error")
+                .build();
+
         return ResponseEntity.badRequest().body(response);
     }
     
