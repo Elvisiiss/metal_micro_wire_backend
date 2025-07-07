@@ -26,13 +26,14 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
         
-        // 特定线材查询接口无需认证：GET /api/wire-material/{batchNumber}
-        String requestURI = request.getRequestURI();
-        String method = request.getMethod();
-        if ("GET".equals(method) && requestURI.matches("/api/wire-material/[^/]+/?$")) {
-            log.debug("公开接口无需认证，URI：{}", requestURI);
-            return true;
-        }
+        // 存在误放行现象
+        // // 特定线材查询接口无需认证：GET /api/wire-material/{batchNumber}
+        // String requestURI = request.getRequestURI();
+        // String method = request.getMethod();
+        // if ("GET".equals(method) && requestURI.matches("/api/wire-material/[^/]+/?$")) {
+        //     log.debug("公开接口无需认证，URI：{}", requestURI);
+        //     return true;
+        // }
         
         // 从请求头中获取token
         String token = getTokenFromRequest(request);

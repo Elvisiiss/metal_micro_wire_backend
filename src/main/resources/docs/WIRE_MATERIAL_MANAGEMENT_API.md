@@ -108,7 +108,7 @@
 
 ### 2. 根据批次号查询线材信息
 
-**GET** `/api/wire-material/{batchNumber}`
+**GET** `/api/wire-material/info/{batchNumber}`
 
 **权限**: 无需认证（公开接口）
 

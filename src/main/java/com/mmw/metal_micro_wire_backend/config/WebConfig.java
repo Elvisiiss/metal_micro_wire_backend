@@ -41,6 +41,8 @@ public class WebConfig implements WebMvcConfigurer {
                         "/images/**",
                         // 文件访问接口
                         "/api/files/**",
+                        // 线材信息查询接口
+                        "/api/wire-material/info/**",
                         // Swagger相关
                         "/swagger-ui/**",
                         "/v3/api-docs/**",

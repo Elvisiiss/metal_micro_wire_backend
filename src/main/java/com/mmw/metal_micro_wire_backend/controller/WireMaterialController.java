@@ -55,7 +55,7 @@ public class WireMaterialController {
      * 根据批次号查询线材信息
      * 权限：无需认证（公开接口）
      */
-    @GetMapping("/{batchNumber}")
+    @GetMapping("/info/{batchNumber}")
     public ResponseEntity<BaseResponse<WireMaterialResponse>> getWireMaterialByBatchNumber(
             @PathVariable @NotBlank(message = "批次号不能为空") String batchNumber,
             HttpServletRequest httpRequest) {
