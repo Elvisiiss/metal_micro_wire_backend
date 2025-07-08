@@ -10,6 +10,10 @@ import com.mmw.metal_micro_wire_backend.repository.QuestionRepository;
 import com.mmw.metal_micro_wire_backend.repository.WireMaterialRepository;
 import com.mmw.metal_micro_wire_backend.service.IoTDataService;
 import com.mmw.metal_micro_wire_backend.service.QualityEvaluationService;
+import com.mmw.metal_micro_wire_backend.service.ChatService;
+import com.mmw.metal_micro_wire_backend.service.TokenService;
+import com.mmw.metal_micro_wire_backend.dto.chat.ChatMessageRequest;
+import com.mmw.metal_micro_wire_backend.dto.chat.ChatMessageResponse;
 import com.mmw.metal_micro_wire_backend.util.EncodingUtil;
 import com.mmw.metal_micro_wire_backend.util.HuaweiIotMessageUtil;
 
@@ -38,6 +42,7 @@ public class IoTDataServiceImpl implements IoTDataService {
     private final HuaweiIotConfig huaweiIotConfig;
     private final QualityEvaluationService qualityEvaluationService;
     private final HuaweiIotMessageUtil huaweiIotMessageUtil;
+    private final ChatService chatService;
     
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
     
@@ -220,7 +225,7 @@ public class IoTDataServiceImpl implements IoTDataService {
                 throw new IllegalArgumentException("未找到AI字段");
             }
             
-            // 生成AI响应内容（目前是模拟响应，后续会接入真正的大语言模型）
+            // 生成AI响应内容（复用现有ChatService，为IoT设备提供智能问答）
             String aiResponseContent = generateAiResponse(questionContent);
             
             Question question = Question.builder()
@@ -247,15 +252,78 @@ public class IoTDataServiceImpl implements IoTDataService {
     
     /**
      * 生成AI响应内容
-     * 目前是模拟响应，后续会接入真正的大语言模型
-     * 
+     * 复用现有ChatService，为IoT设备提供智能问答
+     *
      * @param questionContent 问题内容
      * @return AI响应内容
      */
     private String generateAiResponse(String questionContent) {
-        // TODO: 后续接入大语言模型，根据问题内容生成实际的AI响应
-        // 目前返回模拟响应
-        return "已收到您的问题：" + questionContent + "。我正在为您分析处理，请稍候。";
+        // 验证问题内容
+        if (questionContent == null || questionContent.trim().isEmpty()) {
+            return "未收到有效问题，请重新提问。";
+        }
+
+        try {
+            // 构建聊天请求
+            ChatMessageRequest request = new ChatMessageRequest();
+            request.setMessage(questionContent);
+            request.setTitle("IoT设备问答");
+
+            // 使用固定的IoT用户ID（-1表示IoT系统用户）
+            Long iotUserId = -1L;
+            TokenService.UserType userType = TokenService.UserType.NORMAL;
+
+            // 调用ChatService获取AI响应
+            ChatMessageResponse response = chatService.sendMessage(iotUserId, userType, request);
+
+            // 优化响应内容，适合设备显示
+            String aiResponse = response.getAssistantMessage();
+            return optimizeResponseForDevice(aiResponse);
+
+        } catch (Exception e) {
+            log.error("IoT AI问答失败，问题内容：{}", questionContent, e);
+            // 降级处理：返回友好的错误信息
+            return generateFallbackResponse(questionContent);
+        }
+    }
+
+    /**
+     * 优化AI响应，使其更适合设备显示
+     *
+     * @param aiResponse 原始AI响应
+     * @return 优化后的响应
+     */
+    private String optimizeResponseForDevice(String aiResponse) {
+        if (aiResponse == null || aiResponse.trim().isEmpty()) {
+            return "AI响应为空，请重新提问。";
+        }
+
+        // 限制响应长度（考虑设备显示屏限制）
+        if (aiResponse.length() > 200) {
+            aiResponse = aiResponse.substring(0, 197) + "...";
+        }
+
+        // 移除可能的Markdown格式标记，使响应更适合设备显示
+        aiResponse = aiResponse.replaceAll("\\*\\*", "")
+                              .replaceAll("###", "")
+                              .replaceAll("```[\\s\\S]*?```", "")
+                              .replaceAll("`", "");
+
+        return aiResponse.trim();
+    }
+
+    /**
+     * 生成降级响应
+     *
+     * @param questionContent 原始问题内容
+     * @return 降级响应内容
+     */
+    private String generateFallbackResponse(String questionContent) {
+        // 截断过长的问题内容
+        String shortQuestion = questionContent.length() > 50 ?
+            questionContent.substring(0, 47) + "..." : questionContent;
+
+        return String.format("收到问题：%s。AI服务暂不可用，请联系技术支持。", shortQuestion);
     }
     
     /**
