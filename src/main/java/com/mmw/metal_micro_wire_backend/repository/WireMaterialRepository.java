@@ -376,4 +376,10 @@ public interface WireMaterialRepository extends JpaRepository<WireMaterial, Stri
      */
     @Query(value = "SELECT COUNT(DISTINCT w.device_id) as deviceCount FROM wire_materials w", nativeQuery = true)
     Long getDistinctDeviceCount();
+
+    /**
+     * 获取今日线材检测数据统计
+     */
+    @Query(value = "SELECT COUNT(*) FROM wire_materials w WHERE DATE(w.event_time) = DATE(?1)", nativeQuery = true)
+    int getTodayCount(@Param("now") LocalDateTime now);
 }

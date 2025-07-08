@@ -145,6 +145,29 @@ Authorization: Bearer <token>
 }
 ```
 
+### 4. 今日线材检测数据统计
+
+**GET** `/api/OverView/today_count`
+
+**权限**: 已认证用户
+
+**功能描述**: 获取今日的线材检测数据统计。
+
+**请求示例**:
+```http
+GET /api/OverView/today_count
+Authorization: Bearer <token>
+```
+
+**成功响应示例**:
+```json
+{
+  "msg": "获取今日线材检测数据统计成功",
+  "code": "success",
+  "data": 250
+}
+```
+
 **响应字段说明**:
 - `totalDetectionCount`: 总检测数量
 - `currentMonthCount`: 本月检测数量

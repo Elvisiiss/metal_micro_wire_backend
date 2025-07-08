@@ -78,4 +78,24 @@ public class OverViewController {
         BaseResponse<OverallStatisticsResponse> response = overViewService.getOverallStatistics();
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * 获取今日线材检测数据统计
+     * 权限：已认证用户
+     */
+    @GetMapping("/today_count")
+    public BaseResponse<Integer> getTodayCount(
+            HttpServletRequest httpRequest) {
+
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        String userName = (String) httpRequest.getAttribute("userName");
+
+        log.info("用户{}({})获取今日线材检测数据统计", userName, userId);
+
+        BaseResponse<Integer> response = overViewService.getTodayCount();
+
+        return response;
+    }
+
+
 }

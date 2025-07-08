@@ -248,4 +248,22 @@ public class OverViewServiceImpl implements OverViewService {
             return BaseResponse.error("获取系统总体统计数据失败：" + e.getMessage());
         }
     }
+
+    @Override
+    public BaseResponse<Integer> getTodayCount() {
+        try {
+            log.info("获取今日线材检测数据统计");
+
+            LocalDateTime now = LocalDateTime.now();
+            int todayCount = wireMaterialRepository.getTodayCount(now);
+
+            log.info("今日线材检测数据统计获取成功，共{}条数据", todayCount);
+            return BaseResponse.success("获取今日线材检测数据统计成功", todayCount);
+
+        } catch (Exception e) {
+            log.error("获取今日线材检测数据统计失败", e);
+            return BaseResponse.error("获取今日线材检测数据统计失败：" + e.getMessage());
+        }
+        
+    }
 }

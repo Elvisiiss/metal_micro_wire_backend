@@ -28,4 +28,10 @@ public interface OverViewService {
      * @return 总体统计数据
      */
     BaseResponse<OverallStatisticsResponse> getOverallStatistics();
+
+    /**
+     * 获取今日线材检测数据统计
+     * @return 今日线材检测数据统计
+     */
+    BaseResponse<Integer> getTodayCount();
 }
