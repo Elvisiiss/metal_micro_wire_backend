@@ -2,7 +2,6 @@ package com.mmw.metal_micro_wire_backend.dto.chat;
 
 import lombok.Data;
 
-import java.util.List;
 import java.util.Map;
 
 /**
