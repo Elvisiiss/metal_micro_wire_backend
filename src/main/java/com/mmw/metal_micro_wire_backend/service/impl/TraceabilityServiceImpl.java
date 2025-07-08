@@ -32,31 +32,31 @@ public class TraceabilityServiceImpl implements TraceabilityService {
     private final EmailService emailService;
     private final NotificationConfig notificationConfig;
     private final QualityMonitorConfig qualityMonitorConfig;
-    
+
     // 支持多种日期时间格式
     private static final DateTimeFormatter ISO_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
     private static final DateTimeFormatter STANDARD_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final BigDecimal DEFAULT_FAIL_RATE_THRESHOLD = BigDecimal.valueOf(5.0); // 默认5%不合格率阈值
-    
+
     @Override
     public BaseResponse<TraceabilityAnalysisResponse> performTraceabilityAnalysis(TraceabilityQueryRequest request) {
         try {
             log.info("开始执行溯源分析，维度：{}，值：{}", request.getDimension(), request.getDimensionValue());
-            
+
             // 解析时间参数
             LocalDateTime startTime = request.getStartTime();
             LocalDateTime endTime = request.getEndTime();
-            
+
             // 获取统计数据
             List<QualityStatisticsResponse> statistics = getStatisticsByDimension(request);
-            
+
             // 识别质量问题
             List<QualityIssueResponse> qualityIssues = identifyIssuesFromStatistics(statistics, request);
-            
+
             // 获取总体统计
             TraceabilityAnalysisResponse.OverallStatistics overallStats = calculateOverallStatistics(
                     request.getDimension(), startTime, endTime, request.getScenarioCode());
-            
+
             // 构建响应
             TraceabilityAnalysisResponse response = TraceabilityAnalysisResponse.builder()
                     .dimension(request.getDimension().getDescription())
@@ -66,23 +66,23 @@ public class TraceabilityServiceImpl implements TraceabilityService {
                     .detailStatistics(statistics)
                     .qualityIssues(qualityIssues)
                     .build();
-            
-            log.info("溯源分析完成，维度：{}，统计项数：{}，问题数：{}", 
+
+            log.info("溯源分析完成，维度：{}，统计项数：{}，问题数：{}",
                     request.getDimension(), statistics.size(), qualityIssues.size());
-            
+
             return BaseResponse.success(response);
-            
+
         } catch (Exception e) {
             log.error("执行溯源分析失败", e);
             return BaseResponse.error("溯源分析失败：" + e.getMessage());
         }
     }
-    
+
     @Override
     public BaseResponse<List<QualityStatisticsResponse>> getQualityStatistics(TraceabilityQueryRequest request) {
         try {
             List<QualityStatisticsResponse> statistics = getStatisticsByDimension(request);
-            
+
             // 如果只查询有问题的数据，进行过滤
             if (Boolean.TRUE.equals(request.getOnlyProblematic())) {
                 BigDecimal threshold = BigDecimal.valueOf(request.getFailRateThreshold());
@@ -90,29 +90,29 @@ public class TraceabilityServiceImpl implements TraceabilityService {
                         .filter(stat -> stat.hasQualityIssue(threshold))
                         .collect(Collectors.toList());
             }
-            
+
             return BaseResponse.success(statistics);
-            
+
         } catch (Exception e) {
             log.error("获取质量统计数据失败", e);
             return BaseResponse.error("获取质量统计数据失败：" + e.getMessage());
         }
     }
-    
+
     @Override
     public BaseResponse<List<QualityIssueResponse>> identifyQualityIssues(TraceabilityQueryRequest request) {
         try {
             List<QualityStatisticsResponse> statistics = getStatisticsByDimension(request);
             List<QualityIssueResponse> qualityIssues = identifyIssuesFromStatistics(statistics, request);
-            
+
             return BaseResponse.success(qualityIssues);
-            
+
         } catch (Exception e) {
             log.error("识别质量问题失败", e);
             return BaseResponse.error("识别质量问题失败：" + e.getMessage());
         }
     }
-    
+
     @Override
     public BaseResponse<List<BatchDetailResponse>> getProblematicBatches(String dimension, String dimensionValue,
                                                                         String startTime, String endTime) {
@@ -157,7 +157,7 @@ public class TraceabilityServiceImpl implements TraceabilityService {
             return BaseResponse.error("获取问题批次详情失败：" + e.getMessage());
         }
     }
-    
+
     @Override
     public BaseResponse<String> sendQualityIssueNotifications(List<QualityIssueResponse> qualityIssues) {
         try {
@@ -199,7 +199,7 @@ public class TraceabilityServiceImpl implements TraceabilityService {
             return BaseResponse.error("发送质量问题通知失败：" + e.getMessage());
         }
     }
-    
+
     /**
      * 根据维度获取统计数据
      */
@@ -220,15 +220,15 @@ public class TraceabilityServiceImpl implements TraceabilityService {
         String scenarioCode = request.getScenarioCode();
         String dimensionValue = request.getDimensionValue();
 
-        // 设置默认时间范围（如果未提供）
-        if (startTime == null) {
-            startTime = LocalDateTime.now().minusDays(30);
-            log.info("未提供开始时间，使用默认值：{}", startTime);
-        }
-        if (endTime == null) {
-            endTime = LocalDateTime.now();
-            log.info("未提供结束时间，使用默认值：{}", endTime);
-        }
+//        // 设置默认时间范围（如果未提供）
+//        if (startTime == null) {
+//            startTime = LocalDateTime.now().minusDays(30);
+//            log.info("未提供开始时间，使用默认值：{}", startTime);
+//        }
+//        if (endTime == null) {
+//            endTime = LocalDateTime.now();
+//            log.info("未提供结束时间，使用默认值：{}", endTime);
+//        }
 
         List<Object[]> rawData;
         String dimensionName;
@@ -259,7 +259,7 @@ public class TraceabilityServiceImpl implements TraceabilityService {
 
         return convertToQualityStatistics(rawData, dimensionName);
     }
-    
+
     /**
      * 将原始查询结果转换为质量统计响应对象
      */
