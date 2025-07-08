@@ -6,6 +6,7 @@ import com.mmw.metal_micro_wire_backend.dto.BaseResponse;
 import com.mmw.metal_micro_wire_backend.dto.chat.ChatToolCall;
 import com.mmw.metal_micro_wire_backend.dto.device.DevicePageRequest;
 import com.mmw.metal_micro_wire_backend.dto.device.DevicePageResponse;
+import com.mmw.metal_micro_wire_backend.dto.device.DeviceResponse;
 import com.mmw.metal_micro_wire_backend.entity.Device;
 import com.mmw.metal_micro_wire_backend.dto.overview.OverallStatisticsResponse;
 import com.mmw.metal_micro_wire_backend.dto.overview.ScenarioStatisticsResponse;
@@ -61,7 +62,10 @@ public class ChatToolServiceImpl implements ChatToolService {
         tools.add(createOverallStatisticsTool());
         tools.add(createYearlyStatisticsTool());
         tools.add(createScenarioStatisticsTool());
-        
+
+        // 5. 系统工具
+        tools.add(createGetCurrentTimeTool());
+
         return tools;
     }
     
@@ -86,6 +90,7 @@ public class ChatToolServiceImpl implements ChatToolService {
                 case "get_overall_statistics" -> executeGetOverallStatistics();
                 case "get_yearly_statistics" -> executeGetYearlyStatistics();
                 case "get_scenario_statistics" -> executeGetScenarioStatistics(argsNode);
+                case "get_current_time" -> executeGetCurrentTime(argsNode);
                 default -> "未知的工具调用：" + functionName;
             };
             
@@ -272,26 +277,31 @@ public class ChatToolServiceImpl implements ChatToolService {
         ChatToolCall.Tool tool = new ChatToolCall.Tool();
         ChatToolCall.Function function = new ChatToolCall.Function();
         function.setName("get_quality_issues");
-        function.setDescription("获取质量问题列表，识别不合格的线材批次");
-        
+        function.setDescription("获取质量问题列表，识别不合格的线材批次。默认按生产商维度查询最近30天的数据。");
+
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("type", "object");
         Map<String, Object> properties = new HashMap<>();
-        
+
         Map<String, Object> dimensionParam = new HashMap<>();
         dimensionParam.put("type", "string");
-        dimensionParam.put("description", "查询维度");
+        dimensionParam.put("description", "查询维度，可选值：manufacturer(生产商，默认)、responsible_person(负责人)、process_type(工艺类型)、production_machine(生产机器)");
+        dimensionParam.put("default", "manufacturer");
+        List<String> dimensionEnum = List.of("manufacturer", "responsible_person", "process_type", "production_machine");
+        dimensionParam.put("enum", dimensionEnum);
         properties.put("dimension", dimensionParam);
-        
+
         Map<String, Object> dimensionValueParam = new HashMap<>();
         dimensionValueParam.put("type", "string");
-        dimensionValueParam.put("description", "维度值");
+        dimensionValueParam.put("description", "维度值，用于筛选特定的生产商、负责人、工艺类型或生产机器。不提供则查询所有。");
         properties.put("dimensionValue", dimensionValueParam);
-        
+
         parameters.put("properties", properties);
+        // 设置所有参数为可选
+        parameters.put("required", new ArrayList<>());
         function.setParameters(parameters);
         tool.setFunction(function);
-        
+
         return tool;
     }
     
@@ -380,7 +390,37 @@ public class ChatToolServiceImpl implements ChatToolService {
         
         return tool;
     }
-    
+
+    private ChatToolCall.Tool createGetCurrentTimeTool() {
+        ChatToolCall.Tool tool = new ChatToolCall.Tool();
+        ChatToolCall.Function function = new ChatToolCall.Function();
+        function.setName("get_current_time");
+        function.setDescription("获取当前系统时间和日期信息");
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("type", "object");
+        Map<String, Object> properties = new HashMap<>();
+
+        Map<String, Object> formatParam = new HashMap<>();
+        formatParam.put("type", "string");
+        formatParam.put("description", "时间格式类型：datetime（完整日期时间）、date（仅日期）、time（仅时间）、timestamp（时间戳）");
+        formatParam.put("enum", Arrays.asList("datetime", "date", "time", "timestamp"));
+        formatParam.put("default", "datetime");
+        properties.put("format", formatParam);
+
+        Map<String, Object> timezoneParam = new HashMap<>();
+        timezoneParam.put("type", "string");
+        timezoneParam.put("description", "时区，默认为系统时区（Asia/Shanghai）");
+        timezoneParam.put("default", "Asia/Shanghai");
+        properties.put("timezone", timezoneParam);
+
+        parameters.put("properties", properties);
+        function.setParameters(parameters);
+        tool.setFunction(function);
+
+        return tool;
+    }
+
     // ==================== 工具执行方法 ====================
     
     private String executeGetDeviceList(JsonNode args) {
@@ -415,7 +455,7 @@ public class ChatToolServiceImpl implements ChatToolService {
     private String executeGetDeviceInfo(JsonNode args) {
         try {
             String deviceId = args.get("deviceId").asText();
-            BaseResponse response = deviceService.getDeviceById(deviceId);
+            BaseResponse<DeviceResponse> response = deviceService.getDeviceById(deviceId);
             if ("success".equals(response.getCode())) {
                 return objectMapper.writeValueAsString(response.getData());
             } else {
@@ -529,38 +569,75 @@ public class ChatToolServiceImpl implements ChatToolService {
     private String executeGetQualityIssues(JsonNode args) {
         try {
             TraceabilityQueryRequest request = new TraceabilityQueryRequest();
-            if (args.has("dimension")) {
+
+            // 设置默认维度为MANUFACTURER，避免null值
+            TraceabilityQueryRequest.QueryDimension dimension = TraceabilityQueryRequest.QueryDimension.MANUFACTURER;
+
+            if (args.has("dimension") && !args.get("dimension").isNull()) {
                 String dimensionStr = args.get("dimension").asText();
-                TraceabilityQueryRequest.QueryDimension dimension;
-                switch (dimensionStr) {
-                    case "manufacturer":
-                        dimension = TraceabilityQueryRequest.QueryDimension.MANUFACTURER;
-                        break;
-                    case "responsiblePerson":
-                        dimension = TraceabilityQueryRequest.QueryDimension.RESPONSIBLE_PERSON;
-                        break;
-                    case "processType":
-                        dimension = TraceabilityQueryRequest.QueryDimension.PROCESS_TYPE;
-                        break;
-                    case "productionMachine":
-                        dimension = TraceabilityQueryRequest.QueryDimension.PRODUCTION_MACHINE;
-                        break;
-                    default:
-                        return "无效的查询维度：" + dimensionStr;
+                if (dimensionStr != null && !dimensionStr.trim().isEmpty()) {
+                    switch (dimensionStr.toLowerCase()) {
+                        case "manufacturer":
+                            dimension = TraceabilityQueryRequest.QueryDimension.MANUFACTURER;
+                            break;
+                        case "responsibleperson":
+                        case "responsible_person":
+                            dimension = TraceabilityQueryRequest.QueryDimension.RESPONSIBLE_PERSON;
+                            break;
+                        case "processtype":
+                        case "process_type":
+                            dimension = TraceabilityQueryRequest.QueryDimension.PROCESS_TYPE;
+                            break;
+                        case "productionmachine":
+                        case "production_machine":
+                            dimension = TraceabilityQueryRequest.QueryDimension.PRODUCTION_MACHINE;
+                            break;
+                        default:
+                            log.warn("无效的查询维度：{}，使用默认维度MANUFACTURER", dimensionStr);
+                            // 保持默认值MANUFACTURER
+                    }
                 }
-                request.setDimension(dimension);
             }
-            if (args.has("dimensionValue")) {
-                request.setDimensionValue(args.get("dimensionValue").asText());
+
+            request.setDimension(dimension);
+            log.info("设置查询维度为：{}", dimension);
+
+            if (args.has("dimensionValue") && !args.get("dimensionValue").isNull()) {
+                String dimensionValue = args.get("dimensionValue").asText();
+                if (dimensionValue != null && !dimensionValue.trim().isEmpty()) {
+                    request.setDimensionValue(dimensionValue.trim());
+                }
             }
-            
+
+            // 设置默认的时间范围（最近30天）
+            if (request.getStartTime() == null) {
+                request.setStartTime(java.time.LocalDateTime.now().minusDays(30));
+            }
+            if (request.getEndTime() == null) {
+                request.setEndTime(java.time.LocalDateTime.now());
+            }
+
+            log.info("执行质量问题查询，维度：{}，维度值：{}，时间范围：{} 到 {}",
+                    request.getDimension(), request.getDimensionValue(),
+                    request.getStartTime(), request.getEndTime());
+
             BaseResponse<List<QualityIssueResponse>> response = traceabilityService.identifyQualityIssues(request);
+            if (response == null) {
+                log.error("traceabilityService.identifyQualityIssues返回null响应");
+                return "获取质量问题失败：服务响应为空";
+            }
+
             if ("success".equals(response.getCode())) {
-                return objectMapper.writeValueAsString(response.getData());
+                List<QualityIssueResponse> issues = response.getData();
+                if (issues == null || issues.isEmpty()) {
+                    return "未发现质量问题，所有检测数据均符合质量标准。";
+                }
+                return objectMapper.writeValueAsString(issues);
             } else {
                 return "获取质量问题失败：" + response.getMsg();
             }
         } catch (Exception e) {
+            log.error("获取质量问题出错", e);
             return "获取质量问题出错：" + e.getMessage();
         }
     }
@@ -621,4 +698,57 @@ public class ChatToolServiceImpl implements ChatToolService {
             return "获取场景统计出错：" + e.getMessage();
         }
     }
-} 
+
+    private String executeGetCurrentTime(JsonNode args) {
+        try {
+            // 获取参数
+            String format = args.has("format") ? args.get("format").asText() : "datetime";
+            String timezone = args.has("timezone") ? args.get("timezone").asText() : "Asia/Shanghai";
+
+            // 获取当前时间
+            LocalDateTime now = LocalDateTime.now();
+
+            // 构建响应数据
+            Map<String, Object> timeInfo = new HashMap<>();
+            timeInfo.put("currentTime", now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            timeInfo.put("timezone", timezone);
+            timeInfo.put("timestamp", System.currentTimeMillis());
+
+            // 根据格式返回不同的时间信息
+            switch (format) {
+                case "date":
+                    timeInfo.put("formattedTime", now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+                    timeInfo.put("description", "当前日期");
+                    break;
+                case "time":
+                    timeInfo.put("formattedTime", now.format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+                    timeInfo.put("description", "当前时间");
+                    break;
+                case "timestamp":
+                    timeInfo.put("formattedTime", String.valueOf(System.currentTimeMillis()));
+                    timeInfo.put("description", "当前时间戳");
+                    break;
+                case "datetime":
+                default:
+                    timeInfo.put("formattedTime", now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    timeInfo.put("description", "当前日期和时间");
+                    break;
+            }
+
+            // 添加额外的时间信息
+            timeInfo.put("year", now.getYear());
+            timeInfo.put("month", now.getMonthValue());
+            timeInfo.put("day", now.getDayOfMonth());
+            timeInfo.put("hour", now.getHour());
+            timeInfo.put("minute", now.getMinute());
+            timeInfo.put("second", now.getSecond());
+            timeInfo.put("dayOfWeek", now.getDayOfWeek().toString());
+            timeInfo.put("dayOfYear", now.getDayOfYear());
+
+            return objectMapper.writeValueAsString(timeInfo);
+
+        } catch (Exception e) {
+            return "获取当前时间出错：" + e.getMessage();
+        }
+    }
+}

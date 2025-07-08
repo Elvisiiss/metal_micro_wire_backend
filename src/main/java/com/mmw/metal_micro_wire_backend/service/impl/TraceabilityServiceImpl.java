@@ -204,13 +204,37 @@ public class TraceabilityServiceImpl implements TraceabilityService {
      * 根据维度获取统计数据
      */
     private List<QualityStatisticsResponse> getStatisticsByDimension(TraceabilityQueryRequest request) {
+        // 验证必要参数
+        if (request == null) {
+            log.error("TraceabilityQueryRequest不能为null");
+            throw new IllegalArgumentException("查询请求不能为空");
+        }
+
+        if (request.getDimension() == null) {
+            log.error("查询维度不能为null，请求：{}", request);
+            throw new IllegalArgumentException("查询维度不能为空");
+        }
+
         LocalDateTime startTime = request.getStartTime();
         LocalDateTime endTime = request.getEndTime();
         String scenarioCode = request.getScenarioCode();
         String dimensionValue = request.getDimensionValue();
 
+        // 设置默认时间范围（如果未提供）
+        if (startTime == null) {
+            startTime = LocalDateTime.now().minusDays(30);
+            log.info("未提供开始时间，使用默认值：{}", startTime);
+        }
+        if (endTime == null) {
+            endTime = LocalDateTime.now();
+            log.info("未提供结束时间，使用默认值：{}", endTime);
+        }
+
         List<Object[]> rawData;
         String dimensionName;
+
+        log.info("根据维度获取统计数据，维度：{}，维度值：{}，时间范围：{} 到 {}",
+                request.getDimension(), dimensionValue, startTime, endTime);
 
         switch (request.getDimension()) {
             case MANUFACTURER:
