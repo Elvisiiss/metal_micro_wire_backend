@@ -299,9 +299,9 @@ public class IoTDataServiceImpl implements IoTDataService {
         }
 
         // 限制响应长度（考虑设备显示屏限制）
-        if (aiResponse.length() > 200) {
-            aiResponse = aiResponse.substring(0, 197) + "...";
-        }
+        if (aiResponse.length() > 3000) {
+            aiResponse = aiResponse.substring(0, 2997) + "...";
+        }   
 
         // 移除可能的Markdown格式标记，使响应更适合设备显示
         aiResponse = aiResponse.replaceAll("\\*\\*", "")
